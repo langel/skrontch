@@ -25,15 +25,17 @@ a {
 	display: grid;
 	grid-template-columns: auto 256px;
 	grid-template-rows: 64px auto auto 44px;
-	column-gap: 8px;
-	row-gap: 8px
+	gap: 8px;
 }
 #containment header, #containment footer {
 	grid-column-start: 1;
 	grid-column-end: 3;
-	padding: 10px 20px;
+	padding: 8px 16px;
 	background: var(--black);
 	width: 100%;
+	display: flex;
+	justify-content: left;
+	align-items: center;
 }
 #output {
 	background: #1f1f1f;
@@ -48,6 +50,10 @@ main, nav, aside {
 main {
 	grid-row-start: 2;
 	grid-row-end: 4;
+	margin-left: 8px;
+}
+nav, aside {
+	margin-right: 8px;
 }
 .data {
 	font-family: monospace;
