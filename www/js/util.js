@@ -3,6 +3,7 @@
 const blank = "&#x2800;";
 const br = "<br>";
 
+let char = (ord) => String.fromCharCode(ord);
 let element_new = (t) => document.createElement(t);
 let frame_next = () => { return new Promise(resolve => requestAnimationFrame(resolve)); }
 let localget = (key) => localStorage.getItem(key);

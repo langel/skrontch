@@ -27,6 +27,7 @@ const process = (file, data) => {
 		 data[3] == 77 && // M
 		 data[4] == 26) { // 0x1a
 		logout('NSF file detected . . . ');
+		process_nsf(data);
 	}
 	// check for pce file
 	// ask user for filetype
