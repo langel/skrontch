@@ -15,10 +15,13 @@ const logout = (logline) => {
 const process = (file, data) => {
 	output.innerHTML = file.name;
 	logout(blank);
-	logout('Loading ' + file.name + ' . . . ');
+	logout('loading ' + file.name + ' . . . ');
 	console.log(file);
 	console.log(data);
 	// check for chr file
+	if (file.name.endsWith('.chr')) {
+		process_chr(data);
+	}
 	// check for nes file
 	// check for nsf file
 	if (data[0] == 78 && // N
@@ -26,7 +29,6 @@ const process = (file, data) => {
 		 data[2] == 83 && // S
 		 data[3] == 77 && // M
 		 data[4] == 26) { // 0x1a
-		logout('NSF file detected . . . ');
 		process_nsf(data);
 	}
 	// check for pce file

@@ -1,6 +1,6 @@
 
 const process_nsf = (data) => {
-	logout('processing::');
+	logout('processing nsf data ::');
 	let hi, lo;
 	// load address
 	let address_load = (data[9] << 8) + data[8];
