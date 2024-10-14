@@ -3,17 +3,23 @@ const process_nsf = (data) => {
 	logout('processing::');
 	let hi, lo;
 	// load address
+	let address_load = (data[9] << 8) + data[8];
 	hi = tohex(data[9]);
 	lo = tohex(data[8]);
 	logout('$' + hi + lo + ' address load');
+	console.log(address_load);
 	// init address
+	let address_init = (data[11] << 8) + data[10];
 	hi = tohex(data[11]);
 	lo = tohex(data[10]);
 	logout('$' + hi + lo + ' address init');
+	console.log(address_init);
 	// play adress
+	let address_play = (data[13] << 8) + data[12];
 	hi = tohex(data[13]);
 	lo = tohex(data[12]);
 	logout('$' + hi + lo + ' address play');
+	console.log(address_play);
 	// credits
 	let title = '';
 	let artist = '';
@@ -39,4 +45,17 @@ const process_nsf = (data) => {
 	for (let i = 6; i < 16; i++) nes_header[i] = 0;
 	let nes_rom = new Uint8Array(16 + 32 * 1024);
 	// copy nsf data to load target
+	nes_rom.set(nes_header, 0);
+	console.log(address_load - 0x8000);
+	console.log(0x8000);
+	console.log(data.length);
+	nes_rom.set(data.slice(0x80), address_load - 0x8000);
+	console.log(nes_rom);
+/* TO DO
+	-- find empty chunks of rom
+	-- create portable booter binary
+	-- set rom vectors
+	-- force donload rom
+	-- fail warning on oversized nsf
+*/
 }
