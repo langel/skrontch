@@ -43,6 +43,8 @@ const process_nsf = (data) => {
 	nes_header[4] = 2; // (PRG 16k)
 	nes_header[5] = 1; // (CHR 8k)
 	for (let i = 6; i < 16; i++) nes_header[i] = 0;
+	// XXX header should be added at the end
+	//     16 byte offset is making things sloppy
 	let nes_rom = new Uint8Array(16 + 32 * 1024);
 	// copy nsf data to load target
 	nes_rom.set(nes_header, 0);
@@ -51,8 +53,12 @@ const process_nsf = (data) => {
 	console.log(data.length);
 	nes_rom.set(data.slice(0x80), address_load - 0x8000);
 	console.log(nes_rom);
+	// find empty chunks of rom
+	console.log('zero segments:');
+	console.log(array_value_segments(nes_rom, 0, 256));
+	console.log('255 segments:');
+	console.log(array_value_segments(nes_rom, 255, 256));
 /* TO DO
-	-- find empty chunks of rom
 	-- create portable booter binary
 	-- set rom vectors
 	-- force donload rom
