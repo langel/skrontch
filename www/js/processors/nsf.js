@@ -26,4 +26,17 @@ const process_nsf = (data) => {
 	logout('title: ' + title);
 	logout('artist: ' + artist);
 	logout('copyright: ' + copyright);
+
+	// CONVERTING NSF TO NES ROM
+	// build nes rom header
+	let nes_header = new Uint8Array(16);
+	nes_header[0] = ord('N');
+	nes_header[1] = ord('E');
+	nes_header[2] = ord('S');
+	nes_header[3] = 0x1a;
+	nes_header[4] = 2; // (PRG 16k)
+	nes_header[5] = 1; // (CHR 8k)
+	for (let i = 6; i < 16; i++) nes_header[i] = 0;
+	let nes_rom = new Uint8Array(16 + 32 * 1024);
+	// copy nsf data to load target
 }
