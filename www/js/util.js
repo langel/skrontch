@@ -1,5 +1,7 @@
 
 
+const blank = "&#x2800;";
+const br = "<br>";
 
 let element_new = (t) => document.createElement(t);
 let frame_next = () => { return new Promise(resolve => requestAnimationFrame(resolve)); }
