@@ -13,7 +13,7 @@ const logout = (logline) => {
 }
 
 const process = (file, data) => {
-	output.innerHTML = file.name;
+	output.innerHTML += file.name + "\n";
 	logout(blank);
 	logout('loading ' + file.name + ' . . . ');
 	console.log(file);
