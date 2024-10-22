@@ -69,5 +69,20 @@ window.addEventListener("DOMContentLoaded", () => {
 		e.preventDefault();
 		cont.classList.remove("dragover");
 	});
+	// velocity calculator
+	let velcalc = document.getElementById("velcalc")
+	velcalc.addEventListener('input', () => {
+		let table = '';
+		let velocity = Math.abs(Number(velcalc.value));
+		console.log(velocity);
+		for (let i = 0; i < 7; i++) {
+			let distance = velocity * Math.cos(i * 15 * Math.PI / 180);
+			if (distance < 0.0000000001) distance = 0;
+			let byte_hi = Math.floor(distance);
+			let byte_lo = Math.round((distance - byte_hi) * 256);
+			table += "\n\tbyte " + byte_hi + ", " + byte_lo + "\t" + distance;
+		}
+		output.innerText = 'velcalc' + table;
+	});
 	console.log('core intiialized');
 });
