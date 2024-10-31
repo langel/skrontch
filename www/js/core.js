@@ -12,6 +12,8 @@ const logout = (logline) => {
 	logbox.appendChild(l);
 }
 
+const logclear = () => logbox.innerHTML = '';
+
 const process = (file, data) => {
 	output.innerHTML += file.name + "\n";
 	logout(blank);
@@ -46,6 +48,7 @@ window.addEventListener("DOMContentLoaded", () => {
 		e.preventDefault();
 		cont.classList.remove("dragover");
 		output.innerHTML = '';
+		logclear();
 		[...e.dataTransfer.items].forEach((item, i) => {
 			if (item.kind === 'file') {
 				const file = item.getAsFile();

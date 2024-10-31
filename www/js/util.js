@@ -18,6 +18,26 @@ const localget = (key) => localStorage.getItem(key);
 const localset = (key, val) => localStorage.setItem(key, val);
 
 // arrays
+const array_blank_pages = (arr, val) => {
+	// arr = array to be examined
+	// val = empty value to seeach for
+	// return array of empty pages
+	let out = [];
+	let page_blank = true;
+	let page_id = 0;
+	for (let i = 0; i < arr.length; i++) {
+		if (arr[i] != val) page_blank = false;
+		if (i % 256 == 0 && i != 0) {
+			if (page_blank == true) out.push(page_id);
+			page_id++;
+			page_blank = true;
+		}
+	}
+	return out;
+}
+const array_common = (arrs) => { 
+	return arrs[0].filter(val => arrs.every(arr => arr.includes(val)));
+}
 const array_value_segments = (arr, val, min) => {
 	// arr = array to be examined
 	// val = segment value to search for

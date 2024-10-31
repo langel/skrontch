@@ -1,3 +1,5 @@
+let nsf2rom_map = new Array(32*1024);
+let nsf_pages = [];
 
 const process_nsf = (data) => {
 	logout('processing nsf data ::');
@@ -35,6 +37,7 @@ const process_nsf = (data) => {
 
 	// CONVERTING NSF TO NES ROM
 	// build nes rom header
+	// header added at the end
 	let nes_header = new Uint8Array(16);
 	nes_header[0] = ord('N');
 	nes_header[1] = ord('E');
@@ -43,11 +46,8 @@ const process_nsf = (data) => {
 	nes_header[4] = 2; // (PRG 16k)
 	nes_header[5] = 1; // (CHR 8k)
 	for (let i = 6; i < 16; i++) nes_header[i] = 0;
-	// XXX header should be added at the end
-	//     16 byte offset is making things sloppy
-	let nes_rom = new Uint8Array(16 + 32 * 1024);
-	// copy nsf data to load target
-	nes_rom.set(nes_header, 0);
+	// copy nsf data to nes rom
+	let nes_rom = new Uint8Array(32 * 1024);
 	console.log(address_load - 0x8000);
 	console.log(0x8000);
 	console.log(data.length);
@@ -58,6 +58,13 @@ const process_nsf = (data) => {
 	console.log(array_value_segments(nes_rom, 0, 256));
 	console.log('255 segments:');
 	console.log(array_value_segments(nes_rom, 255, 256));
+	let segments = [...array_blank_pages(nes_rom, 0), ...array_blank_pages(nes_rom, 255)];
+	console.log('empty page segments:');
+	console.log(segments);
+	nsf_pages.push(segments);
+	console.log(array_common(nsf_pages));
+	// copy nsf data to load target
+	//nes_rom.set(nes_header, 0);
 /* TO DO
 	-- create portable booter binary
 	-- set rom vectors
