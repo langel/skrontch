@@ -33,6 +33,8 @@ const array_blank_pages = (arr, val) => {
 			page_blank = true;
 		}
 	}
+	// include final page if unfilled
+	if (page_blank == true) out.push(page_id);
 	return out;
 }
 const array_common = (arrs) => { 
