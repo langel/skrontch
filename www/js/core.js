@@ -73,19 +73,24 @@ window.addEventListener("DOMContentLoaded", () => {
 		cont.classList.remove("dragover");
 	});
 	// velocity calculator
-	let velcalc = document.getElementById("velcalc")
+	let velcalc = document.getElementById("arctang_vel_calc")
 	velcalc.addEventListener('input', () => {
 		let table = '';
 		let velocity = Math.abs(Number(velcalc.value));
+		if (velocity > 255) {
+			output.innerText = '*ERROR* OUT OF RANGE MAX 255';
+			return;
+		}
 		console.log(velocity);
 		for (let i = 0; i < 7; i++) {
 			let distance = velocity * Math.cos(i * 15 * Math.PI / 180);
-			if (distance < 0.0000000001) distance = 0;
+			if (distance < 0.00000001) distance = 0;
+			distance = distance.toFixed(8);
 			let byte_hi = Math.floor(distance).toString().padStart(3, ' ');
 			let byte_lo = Math.floor((distance - byte_hi) * 256).toString().padStart(3, ' ');
 			table += "\n\tbyte    " + byte_lo + ", " + byte_hi + "    ; " + distance;
 		}
-		output.innerText = 'velcalc' + table;
+		output.innerText = 'arctang velocity calculator output:' + table;
 	});
 	console.log('core intiialized');
 });
