@@ -7,7 +7,7 @@ const logout = (logline) => {
 	// XXX need different operations based on type
 	//     objects and arrays have different outputs than strings
 	console.log(logline);
-	let l = element_new('div')
+	let l = elem_new('div')
 	l.innerHTML = logline;
 	logbox.appendChild(l);
 }

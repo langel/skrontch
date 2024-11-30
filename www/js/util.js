@@ -9,7 +9,7 @@ const ord = (char) => char.charCodeAt(0);
 const tohex = (x) => x.toString(16).padStart(2, '0'); 
 
 // DOM
-const element_new = (t) => document.createElement(t);
+const delay = (ms) => { return new Promise(resolve => setTimeout(resolve, ms)); }
 const elem_new = (t) => document.createElement(t);
 const elem_get = (t) => document.getElementById(t);
 const frame_next = () => { return new Promise(resolve => requestAnimationFrame(resolve)); }
@@ -18,8 +18,74 @@ const tobottom = () => window.scrollTo(0, document.body.scrollHeight);
 // local storage
 const localget = (key) => localStorage.getItem(key);
 const localset = (key, val) => localStorage.setItem(key, val);
+const force_donload = (data, filename) => {
+	const blob = new Blob([data]);
+	const url = URL.createObjectURL(blob);
+	const link = document.createElement('a');
+	link.href = url;
+	link.download = filename;
+	link.click();
+	URL.revokeObjectURL(url);
+}
+
+// canvas
+const canvas_clone = (canvas) => {
+	let can = document.createElement('canvas');
+	can.width = canvas.width;
+	can.height = canvas.height;
+	can.style.marginBottom = '2px';
+	let con = can.getContext('2d');
+	con.drawImage(canvas, 0, 0);
+	return { can: can, con: con };
+}
+const canvas_from_img = (img) => {
+	let can = document.createElement('canvas');
+	can.width = img.width;
+	can.height = img.height;
+	can.style.marginBottom = '2px';
+	let con = can.getContext('2d');
+	con.drawImage(img, 0, 0);
+	return { can: can, con: con };
+}
+
+
+// XXX uh need another file for nes specific stuff
+const nes_find_color_id = (color) => {
+	let color_id = nes_palette.indexOf(color);
+	// make sure its the correct black!!
+	if (color_id == 0x0d) color_id = 0x0f;
+	return color_id;
+}
+const pattern_from_grays = async (data) => { // async?
+	// given canvas context 16x16 pixel data, creates nes pattern data
+	let chr = new Uint8Array(16);
+	for (p = 0; p < 256; p += 4) {
+		let val = nes_gvals.indexOf(data.data[p]);
+		if (val == -1) val = 0;
+		// target = 64 pixels * 2bpp
+		let x = 1 << (7 - ((p >> 2) % 8));
+		let y = p >> 5;
+		chr[y] |= (val & 0x01) ? x : 0;
+		chr[y+8] |= (val & 0x02) ? x : 0;
+	}
+	return chr;
+}
+const pixels_from_image = async (img, x, y, w, h) => {
+	let canvas = document.createElement('canvas');
+	let context = canvas.getContext('2d');
+	canvas.width = w;
+	canvas.height = h;
+	context.drawImage(img, x, y, w, h, 0, 0, w, h);
+	return context.getImageData(0, 0, w, h).data;
+}
+const pattern_pos = function(tile_id) {
+	let tileset_width = 128;
+	let tile_w = Math.floor(tileset_width / 16);
+	return { x: (tile_id % tile_w) * 16, y: Math.floor(tile_id / tile_w) * 16 };
+}
 
 // arrays
+// XXX should move nes bank specific codes to another file
 const array_blank_pages = (arr, val) => {
 	// arr = array to be examined
 	// val = empty value to seeach for
