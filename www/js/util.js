@@ -10,6 +10,8 @@ const tohex = (x) => x.toString(16).padStart(2, '0');
 
 // DOM
 const element_new = (t) => document.createElement(t);
+const elem_new = (t) => document.createElement(t);
+const elem_get = (t) => document.getElementById(t);
 const frame_next = () => { return new Promise(resolve => requestAnimationFrame(resolve)); }
 const tobottom = () => window.scrollTo(0, document.body.scrollHeight);
 
