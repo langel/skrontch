@@ -1,9 +1,10 @@
 
 :root {
 	--yellow: #eed202;
-	--dark: #2c2c2c;
-	--black: #0f0f1c;
-	--light: #c2c2c2;
+	--light:  #c2c2c2;
+	--grey:   #7c7c83;
+	--dark:   #2c2c2c;
+	--black:  #0f0f1c;
 }
 html, body {
 	background: var(--dark);
@@ -55,6 +56,22 @@ main {
 }
 nav, aside {
 	margin-right: 8px;
+}
+table {
+	border: 2px solid var(--grey);
+}
+td {
+	border: 1px solid var(--grey);
+	padding: 4px;
+	text-align: center;
+}
+input {
+	font-family: 'Lucida Console', monospace;
+	background: var(--black);
+	color: var(--light);
+	border-radius: 4px;
+	margin: 2px;
+	padding: 2px 5px;
 }
 .data {
 	font-family: monospace;
