@@ -37,14 +37,18 @@ const anim_init = () => {
 	// setup anim preview fps slider
 	let slider = elem_get('fps_rate_slider');
 	slider.setAttribute('max', anim_fps_rates.length - 1);
-	slider.oninput = (e) => {
-		anim_fps = anim_fps_rates[e.target.value];
+	slider.oninput = () => {
+		anim_fps = anim_fps_rates[slider.value];
 		let span = elem_get('fps_rate_display');
 		span.innerHTML = anim_fps + ' fps';
+		proj.anim.fps = anim_fps;
+		skrontch_update();
 	}
-	slider.setAttribute('value', 8);
-	anim_fps = anim_fps_rates[8];
+	anim_fps = anim_fps_rates[proj.anim.fps];
+	slider.value = anim_fps_rates.indexOf(proj.anim.fps);
+	slider.dispatchEvent(new Event('input'));
 	// construct data form
+	form = elem_get('form');
 	let table = elem_new('table');
 	table.setAttribute('id', 'anim_table');
 	table.setAttribute('width', '100%');
@@ -76,6 +80,8 @@ const anim_init = () => {
 		table.appendChild(row);
 	}
 	form.appendChild(table);
+	// set anim cycle in motion
+	anim_update();
 }
 
 const anim_process = () => {
@@ -98,8 +104,3 @@ const anim_update = () => {
 
 
 
-window.addEventListener("DOMContentLoaded", () => {
-	form = elem_get('form');
-	anim_init();
-	anim_update();
-});
