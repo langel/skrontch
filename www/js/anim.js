@@ -83,17 +83,23 @@ const anim_init = () => {
 	// set anim cycle in motion
 	anim_update();
 	// generate chr view
-	let canvas = chr_generate_canvas(proj.chr["char_4_theo.chr"]);
-	console.log(canvas);
-	let chr = elem_get('chr_holder');
-	console.log(chr);
-	chr.appendChild(canvas);
 	let chr_select = elem_get('chr_bank_selector');
-	for (const name of Object.keys(proj.chr)) {
+	if (Object.keys(proj.chr).length == 0) {
+		let option = elem_new('option');
+		option.value = 'null';
+		option.innerText = 'drag .chr files in';
+		option.setAttribute('selected', true);
+		chr_select.appendChild(option);
+		chr_select.selectedIndex = 0;
+	}
+	else for (const name of Object.keys(proj.chr)) {
 		let option = elem_new('option');
 		option.value = name;
 		option.innerText = name;
 		chr_select.appendChild(option);
+	}
+	chr_select.oninput = () => { 
+		anim_render_chr(chr_select.value); 
 	}
 }
 
@@ -116,4 +122,13 @@ const anim_update = () => {
 }
 
 
-
+const anim_render_chr = (chr) => {
+	console.log(chr);
+	if (chr == 'null') return;
+	let canvas = chr_generate_canvas(proj.chr[chr]);
+	console.log(canvas);
+	let chr_holder = elem_get('chr_holder');
+	console.log(chr_holder);
+	chr_holder.innerHTML = '';
+	chr_holder.appendChild(canvas);
+}

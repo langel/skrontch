@@ -5,7 +5,7 @@
 	--grey:   #848c8e;
 	--dark:   #3f373a;
 	--darker: #1e1e24;
-	--black:  #001524;
+	--black:  #130f17;
 }
 html, body {
 	background: var(--black);
