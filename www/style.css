@@ -76,6 +76,9 @@ input {
 	margin: 2px;
 	padding: 2px 5px;
 }
+canvas {
+	image-rendering: pixelated;
+}
 .data {
 	font-family: monospace;
 	font-size: 1.2em;

@@ -25,7 +25,7 @@ let anim_last = 0;
 let anim_counter = 0;
 
 const anim_step_schema = {
-	's': 'tile index',
+	's': 'char index',
 	'a': 'attributes',
 	'x': 'x offset',
 	'y': 'y offset',
@@ -82,6 +82,12 @@ const anim_init = () => {
 	form.appendChild(table);
 	// set anim cycle in motion
 	anim_update();
+	// generate chr view
+	let canvas = chr_generate_canvas(proj.chr["char_4_theo.chr"]);
+	console.log(canvas);
+	let chr = elem_get('chr_holder');
+	console.log(chr);
+	chr.appendChild(canvas);
 }
 
 const anim_process = () => {
