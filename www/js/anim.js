@@ -88,6 +88,13 @@ const anim_init = () => {
 	let chr = elem_get('chr_holder');
 	console.log(chr);
 	chr.appendChild(canvas);
+	let chr_select = elem_get('chr_bank_selector');
+	for (const name of Object.keys(proj.chr)) {
+		let option = elem_new('option');
+		option.value = name;
+		option.innerText = name;
+		chr_select.appendChild(option);
+	}
 }
 
 const anim_process = () => {
