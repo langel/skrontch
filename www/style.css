@@ -1,13 +1,14 @@
 
 :root {
 	--yellow: #eed202;
-	--light:  #c2c2c2;
-	--grey:   #7c7c83;
-	--dark:   #2c2c2c;
-	--black:  #0f0f1c;
+	--light:  #f2f0e4;
+	--grey:   #848c8e;
+	--dark:   #3f373a;
+	--darker: #1e1e24;
+	--black:  #001524;
 }
 html, body {
-	background: var(--dark);
+	background: var(--black);
 	color: var(--light);
 	margin: 0;
 	padding: 0;
@@ -33,19 +34,19 @@ a {
 	grid-column-start: 1;
 	grid-column-end: 3;
 	padding: 8px 16px;
-	background: var(--black);
+	background: var(--dark);
 	width: 100%;
 	display: flex;
 	justify-content: left;
 	align-items: center;
 }
 #output {
-	background: #1f1f1f;
+	background: var(--black);
 	margin: 1em;
 	margin-bottom: 2em;
 }
 main, nav, aside {
-	background: var(--black);
+	background: var(--darker);
 	border-radius: 16px;
 	padding: 8px;
 }
@@ -58,10 +59,12 @@ nav, aside {
 	margin-right: 8px;
 }
 table {
-	border: 2px solid var(--grey);
+	border: 2px solid var(--dark);
+	border-radius: 12px;
 }
 td {
-	border: 1px solid var(--grey);
+	border: 1px solid var(--dark);
+	border-radius: 8px;
 	padding: 4px;
 	text-align: center;
 }

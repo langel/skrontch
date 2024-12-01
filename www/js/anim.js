@@ -20,6 +20,10 @@ let sprite_count = 2;
 let step_count = 4;
 let form;
 
+let anim_fps = 5;
+let anim_last = 0;
+let anim_counter = 0;
+
 const anim_step_schema = {
 	's': 'tile index',
 	'a': 'attributes',
@@ -27,7 +31,20 @@ const anim_step_schema = {
 	'y': 'y offset',
 };
 
+const anim_fps_rates = [ 60, 30, 20, 15, 12, 10, 8, 6, 5, 4, 3, 2, 1 ];
+
 const anim_init = () => {
+	// setup anim preview fps slider
+	let slider = elem_get('fps_rate_slider');
+	slider.setAttribute('max', anim_fps_rates.length - 1);
+	slider.oninput = (e) => {
+		anim_fps = anim_fps_rates[e.target.value];
+		let span = elem_get('fps_rate_display');
+		span.innerHTML = anim_fps + ' fps';
+	}
+	slider.setAttribute('value', 8);
+	anim_fps = anim_fps_rates[8];
+	// construct data form
 	let table = elem_new('table');
 	table.setAttribute('id', 'anim_table');
 	table.setAttribute('width', '100%');
@@ -44,8 +61,6 @@ const anim_init = () => {
 		row.appendChild(row_meta);
 		for (let cols = 0; cols < sprite_count; cols++) {
 			let cell = elem_new('td');
-	//		s_input.value = 0;
-		// XXX build these inputs using above schema loop
 			for (const [id, nick] of Object.entries(anim_step_schema)) {
 				cell.innerHTML += id+' ';
 				let input = elem_new('input');
@@ -67,9 +82,24 @@ const anim_process = () => {
 	let table = elem_get('anim_table');
 }
 
+const anim_update = () => {
+	let then = anim_last;
+	let now = window.performance.now();
+	let elapsed = now - then;
+	let fps_rate = 1000 / anim_fps;
+	if (elapsed > fps_rate) {
+		anim_counter++;
+		anim_last = now - (elapsed % fps_rate);
+		let div = elem_get('counter');
+		div.innerHTML = anim_counter;
+	}
+	requestAnimationFrame(anim_update);
+}
+
 
 
 window.addEventListener("DOMContentLoaded", () => {
 	form = elem_get('form');
 	anim_init();
+	anim_update();
 });
