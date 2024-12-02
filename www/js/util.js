@@ -81,8 +81,8 @@ const pixels_from_image = async (img, x, y, w, h) => {
 }
 const pattern_pos = function(tile_id) {
 	let tileset_width = 128;
-	let tile_w = Math.floor(tileset_width / 16);
-	return { x: (tile_id % tile_w) * 16, y: Math.floor(tile_id / tile_w) * 16 };
+	let tile_w = 8;
+	return { x: (tile_id % tile_w) << 3, y: (tile_id >> 4) << 3 };
 }
 
 // arrays

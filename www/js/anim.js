@@ -126,6 +126,7 @@ const anim_update = () => {
 		anim_last = now - (elapsed % fps_rate);
 		let div = elem_get('counter');
 		div.innerHTML = anim_counter;
+		anim_render_frame();
 	}
 	requestAnimationFrame(anim_update);
 }
@@ -135,9 +136,28 @@ const anim_render_chr = (chr) => {
 	console.log(chr);
 	if (chr == 'null') return;
 	let canvas = chr_generate_canvas(proj.chr[chr]);
+	canvas.setAttribute('id', 'chr_view');
 	console.log(canvas);
 	let chr_holder = elem_get('chr_holder');
 	console.log(chr_holder);
 	chr_holder.innerHTML = '';
 	chr_holder.appendChild(canvas);
+}
+
+const anim_render_frame = () => {
+	let src = elem_get('chr_view');
+	if (src == null) return;
+	let can = elem_new('canvas');
+	can.width = 8;
+	can.height = 8;
+	let scale = 4;
+	can.style.width = (can.width * scale) + 'px';
+	can.style.height = (can.height * scale) + 'px';
+	let con = can.getContext('2d');
+	let frame = anim_counter % 256;
+	let pos = pattern_pos(frame);
+	con.drawImage(src, pos.x, pos.y, 8, 8, 0, 0, 8, 8);
+	let prev = elem_get('preview');
+	prev.innerHTML = '';
+	prev.appendChild(can);
 }
