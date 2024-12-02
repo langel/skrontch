@@ -7,6 +7,7 @@ const br = "<br>";
 const char = (ord) => String.fromCharCode(ord);
 const ord = (char) => char.charCodeAt(0);
 const tohex = (x) => x.toString(16).padStart(2, '0'); 
+const isset = (x) => (typeof x !== 'undefined');
 
 // DOM
 const delay = (ms) => { return new Promise(resolve => setTimeout(resolve, ms)); }

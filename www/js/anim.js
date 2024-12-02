@@ -92,14 +92,23 @@ const anim_init = () => {
 		chr_select.appendChild(option);
 		chr_select.selectedIndex = 0;
 	}
-	else for (const name of Object.keys(proj.chr)) {
+	else for (const name of Object.keys(proj.chr).sort()) {
 		let option = elem_new('option');
 		option.value = name;
 		option.innerText = name;
 		chr_select.appendChild(option);
 	}
-	chr_select.oninput = () => { 
+	chr_select.onchange = () => { 
+		proj.chr_select = chr_select.value;
 		anim_render_chr(chr_select.value); 
+		skrontch_update();
+		console.log('change');
+	}
+	console.log(isset(proj.char_select));
+	console.log(proj.chr_select);
+	if (isset(proj.chr_select)) {
+		chr_select.value = proj.chr_select;
+		chr_select.dispatchEvent(new Event('change'));
 	}
 }
 
