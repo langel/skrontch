@@ -147,16 +147,8 @@ const anim_render_chr = (chr) => {
 const anim_render_frame = () => {
 	let src = elem_get('chr_view');
 	if (src == null) return;
-	let can = elem_new('canvas');
-	can.width = 8;
-	can.height = 8;
-	let scale = 4;
-	can.style.width = (can.width * scale) + 'px';
-	can.style.height = (can.height * scale) + 'px';
-	let con = can.getContext('2d');
-	let frame = anim_counter % 256;
-	let pos = pattern_pos(frame);
-	con.drawImage(src, pos.x, pos.y, 8, 8, 0, 0, 8, 8);
+	let can = chr_gen_sprite(proj.chr[proj.chr_select], anim_counter % 256);
+	canvas_scale(can, 16);
 	let prev = elem_get('preview');
 	prev.innerHTML = '';
 	prev.appendChild(can);

@@ -44,9 +44,54 @@ const chr_generate_canvas = (data) => {
 			}
 		}
 	}
-	let scale = 2;
-	can.style.width = (can.width * scale) + 'px';
-	can.style.height = (can.height * scale) + 'px';
+	canvas_scale(can, 2);
 	return can;
-	
+}
+
+const chr_gen_sprite = (data, index) => {
+	let can = elem_new('canvas');
+	let con = cancon(can);
+	can.width = 8;
+	can.height = 8;
+	let offset = index << 4;
+	for (let k = 0; k < 8; k++) {
+		let lo = data[offset + k];
+		let hi = data[offset + k + 8];
+		// each pixel
+		for (let l = 7; l >= 0; l--) {
+			let val = (lo & (1 << l)) ? 1 : 0;
+			val |= (hi & (1 << l)) ? 2 : 0;
+			if (val) {
+				let color = nes_palette[(val << 4) + 1];
+				let fill_style = 'rgb(' + (color >> 16) + ' ' + ((color >> 8) & 0xff) + ' ' + (color & 0xff) + ')';
+
+				con.fillStyle = fill_style;
+				con.fillRect(7 - l, k, 1, 1);
+			}
+		}
+	}
+	return can;
+}
+
+const chr_gen_tile = (data, index) => {
+	let can = elem_new('canvas');
+	let con = cancon(can);
+	can.width = 8;
+	can.height = 8;
+	let offset = index << 4;
+	for (let k = 0; k < 8; k++) {
+		let lo = data[offset + k];
+		let hi = data[offset + k + 8];
+		// each pixel
+		for (let l = 7; l >= 0; l--) {
+			let val = (lo & (1 << l)) ? 1 : 0;
+			val |= (hi & (1 << l)) ? 2 : 0;
+			let color = nes_palette[(val << 4) + 1];
+			let fill_style = 'rgb(' + (color >> 16) + ' ' + ((color >> 8) & 0xff) + ' ' + (color & 0xff) + ')';
+
+			con.fillStyle = fill_style;
+			con.fillRect(7 - l, k, 1, 1);
+		}
+	}
+	return can;
 }

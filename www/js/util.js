@@ -30,6 +30,7 @@ const force_donload = (data, filename) => {
 }
 
 // canvas
+const cancon = (can) => can.getContext('2d');
 const canvas_clone = (canvas) => {
 	let can = document.createElement('canvas');
 	can.width = canvas.width;
@@ -47,6 +48,10 @@ const canvas_from_img = (img) => {
 	let con = can.getContext('2d');
 	con.drawImage(img, 0, 0);
 	return { can: can, con: con };
+}
+const canvas_scale = (can, scale) => {
+	can.style.width = (can.width * scale) + 'px';
+	can.style.height = (can.height * scale) + 'px';
 }
 
 
