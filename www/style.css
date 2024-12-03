@@ -85,6 +85,19 @@ canvas {
 	line-height: 1.5em;
 	padding: 0 2em 1em 2em;
 }
+.highlight {
+	background: var(--black);
+}
+#anim_controls {
+	font-size: 1.5em;
+}
+#anim_controls div {
+	display: inline-block;
+}
+#anim_controls div:hover {
+	cursor: pointer;
+}
+
 #droptarg {
 	position: fixed;
 	width: 100%;

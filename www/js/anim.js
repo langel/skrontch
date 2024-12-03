@@ -24,6 +24,8 @@ let anim_fps = 5;
 let anim_last = 0;
 let anim_counter = 0;
 
+let anim_play_status = true;
+
 const anim_step_schema = {
 	's': 'char index',
 	'a': 'attributes',
@@ -60,6 +62,7 @@ const anim_init = () => {
 	table.appendChild(header);
 	for (let rows = 0; rows < step_count; rows++) {
 		let row = elem_new('tr');
+		row.classList.add('anim_step_row');
 		let row_meta = elem_new('td');
 		row_meta.innerHTML = 'Anim Step ' + tohex(rows);
 		row.appendChild(row_meta);
@@ -80,6 +83,17 @@ const anim_init = () => {
 		table.appendChild(row);
 	}
 	form.appendChild(table);
+	// setup animation controls
+	elem_get('anim_step_back').addEventListener('click', () => {
+		anim_play_status = false;
+		anim_counter--;
+	});
+	elem_get('anim_play').addEventListener('click', () => anim_play_status = true);
+	elem_get('anim_pause').addEventListener('click', () => anim_play_status = false);
+	elem_get('anim_step_forward').addEventListener('click', () => {
+		anim_play_status = false;
+		anim_counter++;
+	});
 	// set anim cycle in motion
 	anim_update();
 	// generate chr view
@@ -102,10 +116,7 @@ const anim_init = () => {
 		proj.chr_select = chr_select.value;
 		anim_render_chr(chr_select.value); 
 		skrontch_update();
-		console.log('change');
 	}
-	console.log(isset(proj.char_select));
-	console.log(proj.chr_select);
 	if (isset(proj.chr_select)) {
 		chr_select.value = proj.chr_select;
 		chr_select.dispatchEvent(new Event('change'));
@@ -117,34 +128,47 @@ const anim_process = () => {
 }
 
 const anim_update = () => {
-	let then = anim_last;
-	let now = window.performance.now();
-	let elapsed = now - then;
-	let fps_rate = 1000 / anim_fps;
-	if (elapsed > fps_rate) {
-		anim_counter++;
-		anim_last = now - (elapsed % fps_rate);
-		let div = elem_get('counter');
-		div.innerHTML = anim_counter;
-		anim_render_frame();
+	if (anim_play_status) {
+		let then = anim_last;
+		let now = window.performance.now();
+		let elapsed = now - then;
+		let fps_rate = 1000 / anim_fps;
+		if (elapsed > fps_rate) {
+			anim_counter++;
+			anim_last = now - (elapsed % fps_rate);
+			let div = elem_get('counter');
+			div.innerHTML = anim_counter;
+		}
 	}
+	anim_render_frame();
 	requestAnimationFrame(anim_update);
 }
 
 
 const anim_render_chr = (chr) => {
-	console.log(chr);
 	if (chr == 'null') return;
 	let canvas = chr_generate_canvas(proj.chr[chr]);
 	canvas.setAttribute('id', 'chr_view');
-	console.log(canvas);
+	canvas.addEventListener('mousemove', (e) => {
+		const rect = canvas.getBoundingClientRect();
+		const x = e.clientX - rect.left;
+		const y = e.clientY - rect.top;
+		// XXX should track scale of canvas elesewhere and divide by
+		const pattern_id = (x >> 4) + ((y >> 4) << 4);
+		let span = elem_get('pattern_id_display');
+		span.innerText = '0x'+tohex(pattern_id);
+	});
+	canvas.addEventListener('mouseout', () => {
+		let span = elem_get('pattern_id_display');
+		span.innerText = '';
+	});
 	let chr_holder = elem_get('chr_holder');
-	console.log(chr_holder);
 	chr_holder.innerHTML = '';
 	chr_holder.appendChild(canvas);
 }
 
 const anim_render_frame = () => {
+	// draw preview
 	let src = elem_get('chr_view');
 	if (src == null) return;
 	let can = chr_gen_sprite(proj.chr[proj.chr_select], anim_counter % 256);
@@ -152,4 +176,13 @@ const anim_render_frame = () => {
 	let prev = elem_get('preview');
 	prev.innerHTML = '';
 	prev.appendChild(can);
+	// highlight step
+	let step_rows = document.getElementsByClassName('anim_step_row');
+	let step_count = step_rows.length;
+	for (let i = 0; i < step_count; i++) {
+		step_rows[i].classList.remove('highlight');
+		if (i == anim_counter % step_count) {
+			step_rows[i].classList.add('highlight');
+		}
+	}
 }

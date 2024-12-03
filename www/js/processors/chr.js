@@ -1,6 +1,5 @@
 
 const process_chr = (data) => {
-	console.log('processing chr data ::');
 /* TO DO
 	-- schema choices:
 		2bpp 8x8   planar (nes)
@@ -11,13 +10,11 @@ const process_chr = (data) => {
 	-- editing would be out of scope for this file
 		should parallel update data and canvas
 */
-	console.log(data.length);
 	console.log((data.length >> 4) + ' tiles loading . .  .');
 
 }
 
 const chr_generate_canvas = (data) => {
-	console.log(data);
 	process_chr(data);
 	let chr_count = data.length >> 4;
 	let can = document.createElement("canvas");
