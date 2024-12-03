@@ -1,8 +1,11 @@
 
 let proj = {
+	// animation settings
 	anim: {
 		fps: 8,
+		anims: {},
 	},
+	// chr rom banks
 	chr: {},
 };
 

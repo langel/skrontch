@@ -12,6 +12,7 @@ const process = (file, data) => {
 	if (file.name.endsWith('.chr')) {
 		process_chr(data);
 		proj.chr[file.name] = Array.from(data);
+		anim_chr_new(file.name);
 		skrontch_update();
 	}
 	// check for nes file

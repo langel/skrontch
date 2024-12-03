@@ -9,6 +9,8 @@ const ord = (char) => char.charCodeAt(0);
 const tohex = (x) => x.toString(16).padStart(2, '0'); 
 const isset = (x) => (typeof x !== 'undefined');
 
+const obj_clone = (obj) => JSON.parse(JSON.stringify(obj));
+
 // DOM
 const delay = (ms) => { return new Promise(resolve => setTimeout(resolve, ms)); }
 const elem_new = (t) => document.createElement(t);
