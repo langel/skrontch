@@ -90,6 +90,7 @@ canvas {
 }
 #anim_controls {
 	font-size: 1.5em;
+	user-select: none;
 }
 #anim_controls div {
 	display: inline-block;

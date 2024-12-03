@@ -121,6 +121,10 @@ const anim_init = () => {
 		chr_select.value = proj.chr_select;
 		chr_select.dispatchEvent(new Event('change'));
 	}
+	// generate nes full canvas
+	let pal_full_canvas = nes_pal_full_canvas();
+	let pal_full = elem_get('pal_full');
+	pal_full.appendChild(pal_full_canvas);
 }
 
 const anim_process = () => {
@@ -136,10 +140,10 @@ const anim_update = () => {
 		if (elapsed > fps_rate) {
 			anim_counter++;
 			anim_last = now - (elapsed % fps_rate);
-			let div = elem_get('counter');
-			div.innerHTML = anim_counter;
 		}
 	}
+	let div = elem_get('anim_counter');
+	div.innerHTML = anim_counter;
 	anim_render_frame();
 	requestAnimationFrame(anim_update);
 }
@@ -173,7 +177,7 @@ const anim_render_frame = () => {
 	if (src == null) return;
 	let can = chr_gen_sprite(proj.chr[proj.chr_select], anim_counter % 256);
 	canvas_scale(can, 16);
-	let prev = elem_get('preview');
+	let prev = elem_get('anim_preview');
 	prev.innerHTML = '';
 	prev.appendChild(can);
 	// highlight step

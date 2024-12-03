@@ -15,6 +15,7 @@ const skrontch_init = () => {
 	// initialize subsystems
 	anim_init();
 	drop_init();
+	nes_pal_gen();
 }
 
 

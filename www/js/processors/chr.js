@@ -59,10 +59,8 @@ const chr_gen_sprite = (data, index) => {
 			let val = (lo & (1 << l)) ? 1 : 0;
 			val |= (hi & (1 << l)) ? 2 : 0;
 			if (val) {
-				let color = nes_palette[(val << 4) + 1];
-				let fill_style = 'rgb(' + (color >> 16) + ' ' + ((color >> 8) & 0xff) + ' ' + (color & 0xff) + ')';
 
-				con.fillStyle = fill_style;
+				con.fillStyle = nes_pal_rgb[(val << 4) + 1];
 				con.fillRect(7 - l, k, 1, 1);
 			}
 		}
