@@ -1,6 +1,7 @@
 
 :root {
 	--yellow: #eed202;
+	--red:    #9b2423;
 	--light:  #f2f0e4;
 	--grey:   #848c8e;
 	--dark:   #3f373a;
@@ -87,6 +88,16 @@ canvas {
 }
 .highlight {
 	background: var(--black);
+}
+input.dec_in {
+	width: 111px;
+}
+input.hex_in {
+	width: 40px;
+}
+input.error, input.error:focus {
+	outline: none;
+	border: 2px solid var(--red);
 }
 #anim_controls {
 	font-size: 1.5em;

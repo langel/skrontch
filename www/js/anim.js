@@ -224,16 +224,23 @@ anim_render_animation_form = async () => {
 		for (const [cols, sprite] of step.sprites.entries()) {
 			let cell = elem_new('td');
 			for (const [attr, nick] of Object.entries(anim_sprite_defs)) {
+				let input_dec = elem_new('input');
+				input_dec.id = 'anim_'+rows+'_'+cols+'_'+attr;
+				input_dec.setAttribute('step_attr', rows);
+				input_dec.setAttribute('sprite_attr', cols);
+				input_dec.setAttribute('attr_attr', attr);
+				let input_hex = input_dec.cloneNode();
+				input_dec.id += '_dec';
+				input_dec.type = 'number';
+				input_dec.placeholder = nick;
+				input_dec.classList.add('dec_in');
+				input_hex.id += '_hex';
+				input_hex.maxlength = 3;
+				input_hex.placeholder = 'hex';
+				input_hex.classList.add('hex_in');
 				cell.innerHTML += attr+' ';
-				let input = elem_new('input');
-				cell.appendChild(input);
-				input.id = 'anim_'+rows+'_'+cols+'_'+attr;
-	//			input.setAttribute('type', 'number');
-				input.placeholder = nick;
-				input.setAttribute('step_attr', rows);
-				input.setAttribute('sprite_attr', cols);
-				input.setAttribute('attr_attr', attr);
-				console.log(input.value);
+				cell.appendChild(input_dec);
+				cell.appendChild(input_hex);
 				cell.innerHTML += '<br>';
 			}
 			row.appendChild(cell);
@@ -245,18 +252,41 @@ anim_render_animation_form = async () => {
 	for (const [rows, step] of animation.steps.entries()) {
 		for (const [cols, sprite] of step.sprites.entries()) {
 			for (const [attr, nick] of Object.entries(anim_sprite_defs)) {
-				let input = elem_get('anim_'+rows+'_'+cols+'_'+attr);
+				let input_dec = elem_get('anim_'+rows+'_'+cols+'_'+attr+'_dec');
+				let input_hex = elem_get('anim_'+rows+'_'+cols+'_'+attr+'_hex');
 				let val = animation.steps[rows].sprites[cols][attr];
-				if (val !== null) input.value = parseInt(val);
-				input.addEventListener('input', (e) => {
-					console.log('ass');
+				if (val !== null && val !== undefined) {
+					input_dec.value = parseInt(val);
+					input_hex.value = tohex(parseInt(val));
+				}
+				input_dec.addEventListener('input', (e) => {
+					const input = e.target;
 					let step = input.getAttribute('step_attr');
 					let sprite = input.getAttribute('sprite_attr');
 					let attr = input.getAttribute('attr_attr');
-					let val = e.target.value;
+					let val = input.value;
+					if (val > 255) val = 0;
+					else if (val < 0) val = 255;
+					input.value = val;
+					let input_hex = elem_get('anim_'+step+'_'+sprite+'_'+attr+'_hex');
+					input_hex.value = tohex(parseInt(val));
 					animation.steps[step].sprites[sprite][attr] = val;
-					console.log(val);
-				console.log(input);
+					skrontch_update();
+				});
+				input_hex.addEventListener('input', (e) => {
+					const input = e.target;
+					let step = input.getAttribute('step_attr');
+					let sprite = input.getAttribute('sprite_attr');
+					let attr = input.getAttribute('attr_attr');
+					if (!/^[0-9A-Fa-f]+$/.test(input.value)) {
+						input.classList.add('error');
+						return;
+					}
+					let val = parseInt(input.value, 16);
+					input.classList.remove('error');
+					let input_dec = elem_get('anim_'+step+'_'+sprite+'_'+attr+'_dec');
+					input_dec.value = val;
+					animation.steps[step].sprites[sprite][attr] = val;
 					skrontch_update();
 				});
 			}
