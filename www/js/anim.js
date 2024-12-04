@@ -42,7 +42,7 @@ const anim_sprite_schema = {
 };
 
 const anim_sprite_defs = {
-	's': 'char index',
+	's': 'index',
 	'a': 'attributes',
 	'x': 'x offset',
 	'y': 'y offset',
@@ -186,11 +186,24 @@ const anim_render_frame = () => {
 	// draw preview
 	let src = elem_get('chr_view');
 	if (src == null) return;
-	let can = chr_gen_sprite(proj.chr[animation.chr], anim_counter % 256);
-	canvas_scale(can, 16);
+	let step = animation.steps[anim_counter % animation.steps.length];
+	let canvas = elem_new('canvas');
+	canvas.width = 64;
+	canvas.height = 32;
+	let ctx = cancon(canvas);
+	// XXX should calculate size/pos of all frames and sprites
+	//     then we can draw muted 0,0 lines and center everything 
+	//let bounds = { x1:0, y1:0, x2:0, y2:0 };
+	for (const sprite of step.sprites) {
+		if (sprite.s !== null && sprite.a !== null && sprite.x !== null && sprite.y !== null) {
+			let can = chr_gen_sprite(proj.chr[animation.chr], sprite.s);
+			ctx.drawImage(can, parseInt(sprite.x)+24, parseInt(sprite.y)+8);
+		}
+	}
+	canvas_scale(canvas, 4);
 	let preview = elem_get('anim_preview');
 	preview.innerHTML = '';
-	preview.appendChild(can);
+	preview.appendChild(canvas);
 	// highlight step
 	let step_rows = document.getElementsByClassName('anim_step_row');
 	let step_count = step_rows.length;
@@ -235,7 +248,7 @@ anim_render_animation_form = async () => {
 				input_dec.placeholder = nick;
 				input_dec.classList.add('dec_in');
 				input_hex.id += '_hex';
-				input_hex.maxlength = 3;
+				input_hex.setAttribute('maxlength', 2);
 				input_hex.placeholder = 'hex';
 				input_hex.classList.add('hex_in');
 				cell.innerHTML += attr+' ';

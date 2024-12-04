@@ -89,11 +89,14 @@ canvas {
 .highlight {
 	background: var(--black);
 }
+input::placeholder {
+	font-size: 0.75em;
+}
 input.dec_in {
-	width: 111px;
+	width: 64px;
 }
 input.hex_in {
-	width: 40px;
+	width: 32px;
 }
 input.error, input.error:focus {
 	outline: none;
