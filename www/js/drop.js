@@ -8,6 +8,13 @@
 const process = (file, data) => {
 	console.log(file);
 	console.log(data);
+	// load project file
+	if (file.name.endsWith('.skrontch')) {
+		const text = new TextDecoder().decode(data);
+		proj = JSON.parse(text);
+		skrontch_update();
+		location.reload(true);
+	}
 	// check for chr file
 	if (file.name.endsWith('.chr')) {
 		process_chr(data);
