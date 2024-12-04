@@ -29,6 +29,12 @@ const anim_schema = {
 	chr: '',
 	fps: 8,
 	steps: [],
+	palette: [
+		0, 0x01, 0x12, 0x23,
+		0, 0x04, 0x15, 0x26,
+		0, 0x09, 0x19, 0x29,
+		0, 0x0c, 0x1c, 0x2c,
+	],
 };
 const anim_step_schema = {
 	frame_length: 8,
@@ -91,16 +97,22 @@ const anim_init = () => {
 		anim_play_status = false;
 		anim_counter++;
 	});
+	// construct animation selector
+	let anim_select = elem_get('animation_select');
+	for (const [name, data] of Object.entries(proj.anim.anims)) {
+		let option = elem_new('option');
+		option.value = name;
+		option.text = name;
+		anim_select.appendChild(option);
+	}
 	// construct data form
 	anim_render_animation_form();
 	// set anim cycle in motion
 	anim_update();
 	// generate chr view
 	anim_render_chr_select();
-	// generate nes full palette
-	let pal_full_canvas = nes_pal_full_canvas();
-	let pal_full = elem_get('pal_full');
-	pal_full.appendChild(pal_full_canvas);
+	// generate nes palette editor
+	nes_pal_editor_init();
 }
 
 const anim_process = () => {
@@ -124,7 +136,7 @@ const anim_update = () => {
 	requestAnimationFrame(anim_update);
 }
 
-
+// renders whole graphical banks
 const anim_render_chr = (chr) => {
 	if (chr == 'null') return;
 	let canvas = chr_generate_canvas(proj.chr[chr]);
@@ -196,7 +208,9 @@ const anim_render_frame = () => {
 	//let bounds = { x1:0, y1:0, x2:0, y2:0 };
 	for (const sprite of step.sprites) {
 		if (sprite.s !== null && sprite.a !== null && sprite.x !== null && sprite.y !== null) {
-			let can = chr_gen_sprite(proj.chr[animation.chr], sprite.s);
+			let first = (sprite.a & 0x03) << 2;
+			let colors = animation.palette.slice(first, first+4);
+			let can = chr_gen_sprite(proj.chr[animation.chr], sprite.s, sprite.a, colors);
 			ctx.drawImage(can, parseInt(sprite.x)+24, parseInt(sprite.y)+8);
 		}
 	}

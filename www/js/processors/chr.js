@@ -45,7 +45,9 @@ const chr_generate_canvas = (data) => {
 	return can;
 }
 
-const chr_gen_sprite = (data, index) => {
+const chr_gen_sprite = (data, index, attr, pal) => {
+	let mirror = attr >> 7;
+	let flip = (attr >> 6) & 0x01;
 	let can = elem_new('canvas');
 	let con = cancon(can);
 	can.width = 8;
@@ -59,7 +61,7 @@ const chr_gen_sprite = (data, index) => {
 			let val = (lo & (1 << l)) ? 1 : 0;
 			val |= (hi & (1 << l)) ? 2 : 0;
 			if (val) {
-				con.fillStyle = nes_pal_rgb[(val << 4) + 1];
+				con.fillStyle = nes_pal_rgb[pal[val]];
 				con.fillRect(7 - l, k, 1, 1);
 			}
 		}
