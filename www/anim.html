@@ -14,7 +14,24 @@
 			<a id="control_save" href="/save">SAVE</a>
 		</header>
 		<main>
-			<select id="animation_select"></select>
+			<div id="anim_menu">
+				<select id="animation_select"></select>
+				&nbsp;
+				<a id="anim_rename" href="/anim_rename">RENAME</a>
+				&nbsp;
+				<a id="anim_clone" href="/anim_clone">CLONE</a>
+			</div>
+
+			<div id="anim_rename_form" class="hidden">
+				<input id="anim_rename_input" type="text">
+				&nbsp;
+				<a id="anim_rename_save" href="/anim_rename">UPDATE</a>
+			</div>
+			<div id="anim_clone_form" class="hidden">
+				<input id="anim_clone_input" type="text">
+				&nbsp;
+				<a id="anim_clone_save" href="/anim_clone">CLONE</a>
+			</div>
 			<div class="h_space"></div>
 			<div id="form"></div>
 		</main>

@@ -13,8 +13,9 @@ const obj_clone = (obj) => JSON.parse(JSON.stringify(obj));
 
 // DOM
 const delay = (ms) => { return new Promise(resolve => setTimeout(resolve, ms)); }
-const elem_new = (t) => document.createElement(t);
 const elem_get = (t) => document.getElementById(t);
+const elem_new = (t) => document.createElement(t);
+const elem_listen = (t, type, f) => elem_get(t).addEventListener(type, f);
 const frame_next = () => { return new Promise(resolve => requestAnimationFrame(resolve)); }
 const tobottom = () => window.scrollTo(0, document.body.scrollHeight);
 

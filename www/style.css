@@ -69,13 +69,15 @@ td {
 	padding: 4px;
 	text-align: center;
 }
-input {
-	font-family: 'Lucida Console', monospace;
+input, select {
 	background: var(--black);
 	color: var(--light);
 	border-radius: 4px;
 	margin: 2px;
 	padding: 2px 5px;
+}
+#anim_table input {
+	font-family: 'Lucida Console', monospace;
 }
 canvas {
 	image-rendering: pixelated;
@@ -121,3 +123,4 @@ input.error, input.error:focus {
 }
 
 .h_space { height: 8px; }
+.hidden { display:none; }

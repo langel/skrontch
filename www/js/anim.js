@@ -97,14 +97,8 @@ const anim_init = () => {
 		anim_play_status = false;
 		anim_counter++;
 	});
-	// construct animation selector
-	let anim_select = elem_get('animation_select');
-	for (const [name, data] of Object.entries(proj.anim.anims)) {
-		let option = elem_new('option');
-		option.value = name;
-		option.text = name;
-		anim_select.appendChild(option);
-	}
+	// menu bar
+	anim_menubar_init();
 	// construct data form
 	anim_render_animation_form();
 	// set anim cycle in motion
@@ -230,7 +224,38 @@ const anim_render_frame = () => {
 }
 
 
-anim_render_animation_form = async () => {
+const anim_menubar_init = () => {
+	// construct animation selector
+	let anim_select = elem_get('animation_select');
+	for (const [name, data] of Object.entries(proj.anim.anims)) {
+		let option = elem_new('option');
+		option.value = name;
+		option.text = name;
+		anim_select.appendChild(option);
+	}
+	// rename
+	elem_get('anim_rename').addEventListener('click', (e) => {
+		e.preventDefault();
+		elem_get('anim_rename_form').style.display = 'block';
+		let input = elem_get('anim_rename_input');
+		input.value = proj.anim.current;
+		requestAnimationFrame(() => input.focus());
+		elem_get('anim_rename_save').addEventListener('click', (e) => { 
+			e.preventDefault(); 
+			// XXX not saving yet
+			// need to error check for matching names
+			console.log(input.value);
+			elem_get('anim_rename_form').style.display = 'none';
+		});
+	});
+	// clone
+	elem_get('anim_clone').addEventListener('click', (e) => {
+		e.preventDefault();
+	});
+}
+
+
+const anim_render_animation_form = async () => {
 	anim_form = elem_get('form');
 	let table = elem_new('table');
 	table.setAttribute('id', 'anim_table');
