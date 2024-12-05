@@ -325,6 +325,7 @@ const anim_menubar_init = () => {
 		if (input.classList.contains('error')) return;
 		proj.anim.anims[input.value] = obj_clone(proj.anim.anims[proj.anim.current]);
 		proj.anim.current = input.value;
+		animation = proj.anim.anims[proj.anim.current];
 		elem_get('anim_menu').style.display = 'block';
 		elem_get('anim_clone_form').style.display = 'none';
 		anim_menubar_build_animation_select();
@@ -335,6 +336,37 @@ const anim_menubar_init = () => {
 		elem_get('anim_menu').style.display = 'block';
 		elem_get('anim_clone_form').style.display = 'none';
 	});
+	// delete
+	elem_listen('anim_delete', 'click', (e) => {
+		e.preventDefault();
+		elem_get('anim_delete_name').innerText = proj.anim.current;
+		elem_get('anim_menu').style.display = 'none';
+		elem_get('anim_delete_form').style.display = 'block';
+		elem_get('anim_delete_error').style.display = 'none';
+	});
+	elem_listen('anim_delete_save', 'click', (e) => {
+		e.preventDefault(); 
+		let select = elem_get('animation_select');
+		if (select.options.length > 1) {
+			let index = select.selectedIndex;
+			delete proj.anim.anims[select.value];
+			select.remove(index);
+			select.selectedIndex = 0;
+			proj.anim.current = select.children[0].value;
+			console.log(select.children[0].value);
+			console.log(proj.anim.anims[select.children[0].value]);
+			animation = proj.anim.anims[proj.anim.current];
+			elem_get('anim_menu').style.display = 'block';
+			elem_get('anim_delete_form').style.display = 'none';
+			anim_menubar_build_animation_select();
+			skrontch_update();
+		}
+	});
+	elem_listen('anim_delete_cancel', 'click', (e) => {
+		e.preventDefault(); 
+		elem_get('anim_menu').style.display = 'block';
+		elem_get('anim_delete_form').style.display = 'none';
+	});
 }
 
 const anim_menubar_build_animation_select = () => {
@@ -342,7 +374,6 @@ const anim_menubar_build_animation_select = () => {
 	anim_select.innerHTML = '';
 	for (const [name, data] of Object.entries(proj.anim.anims)) {
 		let option = elem_new('option');
-		console.log(name);
 		option.value = name;
 		option.innerText = name;
 		if (option.value == proj.anim.current) {
