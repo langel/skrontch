@@ -236,15 +236,28 @@ const anim_menubar_init = () => {
 	// rename
 	elem_get('anim_rename').addEventListener('click', (e) => {
 		e.preventDefault();
+		elem_get('anim_menu').style.display = 'none';
 		elem_get('anim_rename_form').style.display = 'block';
 		let input = elem_get('anim_rename_input');
+		let input_old = proj.anim.current;
 		input.value = proj.anim.current;
 		requestAnimationFrame(() => input.focus());
 		elem_get('anim_rename_save').addEventListener('click', (e) => { 
 			e.preventDefault(); 
 			// XXX not saving yet
 			// need to error check for matching names
+			/*
+			var new_input = input.cloneNode();
+			input.parentNode.replaceChild(new_input, input);
+			*/
+			console.log(input_old);
 			console.log(input.value);
+			elem_get('anim_menu').style.display = 'block';
+			elem_get('anim_rename_form').style.display = 'none';
+		});
+		elem_listen('anim_rename_cancel', 'click', (e) => {
+			e.preventDefault(); 
+			elem_get('anim_menu').style.display = 'block';
 			elem_get('anim_rename_form').style.display = 'none';
 		});
 	});
