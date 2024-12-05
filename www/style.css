@@ -1,6 +1,7 @@
 
 :root {
 	--yellow: #eed202;
+	--purple: #401c3c;
 	--red:    #9b2423;
 	--light:  #f2f0e4;
 	--grey:   #848c8e;
@@ -35,12 +36,13 @@ a {
 	grid-column-start: 1;
 	grid-column-end: 3;
 	padding: 8px 16px;
-	background: var(--dark);
+	background: var(--purple);
 	width: 100%;
 	display: flex;
 	justify-content: left;
 	align-items: center;
 }
+footer { font-style: italic; }
 #output {
 	background: var(--black);
 	margin: 1em;
