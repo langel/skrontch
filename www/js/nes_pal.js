@@ -34,8 +34,11 @@ let nes_pal_edit;
 let nes_pal_temp = 0;
 let nes_pal_clicked = 0;
 
+
 const nes_pal_editor_init = () => {
+
 	nes_pal_edit = elem_get('nes_pal_edit');
+
 	nes_pal_curr = elem_get('nes_pal_curr');
 	nes_pal_curr.replaceChildren(nes_pal_curr_canvas(animation.palette));
 	nes_pal_curr.addEventListener('click', (e) => {
@@ -48,6 +51,17 @@ const nes_pal_editor_init = () => {
 			nes_pal_full.style.display = 'none';
 		});
 	});
+	nes_pal_curr.addEventListener('mousemove', (e) => {
+		const rect = nes_pal_curr.getBoundingClientRect();
+		const addr = (e.clientX - rect.left) >> 4;
+		let span = elem_get('pattern_id_display');
+		span.innerText = '$3f'+tohex(addr);
+	});
+	nes_pal_curr.addEventListener('mouseout', () => {
+		let span = elem_get('pattern_id_display');
+		span.innerText = '';
+	});
+
 	nes_pal_full = elem_get('nes_pal_full');
 	nes_pal_full.replaceChildren(nes_pal_full_canvas());
 	nes_pal_full.style.display = 'none';

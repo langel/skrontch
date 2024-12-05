@@ -46,8 +46,7 @@ const chr_generate_canvas = (data) => {
 }
 
 const chr_gen_sprite = (data, index, attr, pal) => {
-	let mirror = attr >> 7;
-	let flip = (attr >> 6) & 0x01;
+	let flipmirr = attr & 0xc0;
 	let can = elem_new('canvas');
 	let con = cancon(can);
 	can.width = 8;
@@ -62,7 +61,14 @@ const chr_gen_sprite = (data, index, attr, pal) => {
 			val |= (hi & (1 << l)) ? 2 : 0;
 			if (val) {
 				con.fillStyle = nes_pal_rgb[pal[val]];
-				con.fillRect(7 - l, k, 1, 1);
+				// no flip or mirror
+				if (flipmirr == 0x00) con.fillRect(7-l, k, 1, 1);
+				// mirror no flip
+				else if (flipmirr == 0x40) con.fillRect(l, k, 1, 1);
+				// flip no mirror
+				else if (flipmirr == 0x80) con.fillRect(7-l, 7-k, 1, 1);
+				// flip and mirror
+				else if (flipmirr == 0xc0) con.fillRect(l, 7-k, 1, 1);
 			}
 		}
 	}
