@@ -45,7 +45,6 @@ const drop_init = () => {
 	droptarg.addEventListener("drop", (e) => {
 		e.preventDefault();
 		cont.classList.remove("dragover");
-		output.innerHTML = '';
 		[...e.dataTransfer.items].forEach((item, i) => {
 			if (item.kind === 'file') {
 				const file = item.getAsFile();

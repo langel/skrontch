@@ -224,47 +224,132 @@ const anim_render_frame = () => {
 }
 
 
+// XXX needs proper abstraction
+//     very redundant processes
 const anim_menubar_init = () => {
 	// construct animation selector
-	let anim_select = elem_get('animation_select');
-	for (const [name, data] of Object.entries(proj.anim.anims)) {
-		let option = elem_new('option');
-		option.value = name;
-		option.text = name;
-		anim_select.appendChild(option);
-	}
+	anim_menubar_build_animation_select();
+	elem_listen('animation_select', 'input', (e) => {
+		console.log('anim change');
+		proj.anim.current = e.target.value;
+		console.log(e.target.value);
+		animation = proj.anim.anims[proj.anim.current];
+		requestAnimationFrame(() => {
+			anim_render_animation_form();
+		});
+	});
 	// rename
-	elem_get('anim_rename').addEventListener('click', (e) => {
+	elem_listen('anim_rename', 'click', (e) => {
 		e.preventDefault();
 		elem_get('anim_menu').style.display = 'none';
 		elem_get('anim_rename_form').style.display = 'block';
+		elem_get('anim_rename_error').style.display = 'none';
 		let input = elem_get('anim_rename_input');
-		let input_old = proj.anim.current;
 		input.value = proj.anim.current;
-		requestAnimationFrame(() => input.focus());
-		elem_get('anim_rename_save').addEventListener('click', (e) => { 
-			e.preventDefault(); 
-			// XXX not saving yet
-			// need to error check for matching names
-			/*
-			var new_input = input.cloneNode();
-			input.parentNode.replaceChild(new_input, input);
-			*/
-			console.log(input_old);
-			console.log(input.value);
-			elem_get('anim_menu').style.display = 'block';
-			elem_get('anim_rename_form').style.display = 'none';
+		requestAnimationFrame(() => {
+			input.focus()
+			input.dispatchEvent(new Event('input'));
+			input.setSelectionRange(input.value.length, input.value.length);
 		});
-		elem_listen('anim_rename_cancel', 'click', (e) => {
-			e.preventDefault(); 
-			elem_get('anim_menu').style.display = 'block';
-			elem_get('anim_rename_form').style.display = 'none';
-		});
+	});
+	elem_listen('anim_rename_input', 'input', (e) => {
+		let input = elem_get('anim_rename_input');
+		let val = input.value;
+		for (const [title, data] of Object.entries(proj.anim.anims)) {
+			if (title == val) {
+				// display error
+				input.classList.add('error');
+				elem_get('anim_rename_error').style.display = 'inline';
+				elem_get('anim_rename_error').innerText = 'Error: Name already in use.';
+				return;
+			}
+		}
+		input.classList.remove('error');
+		elem_get('anim_rename_error').style.display = 'none';
+	});
+	elem_listen('anim_rename_input', 'keydown', (e) => {
+		if (e.key == 'Enter') elem_get('anim_rename_save').click();
+	});
+	elem_listen('anim_rename_save', 'click', (e) => {
+		e.preventDefault(); 
+		let input = elem_get('anim_rename_input');
+		if (input.classList.contains('error')) return;
+		proj.anim.anims[input.value] = obj_clone(proj.anim.anims[proj.anim.current]);
+		delete proj.anim.anims[proj.anim.current];
+		proj.anim.current = input.value;
+		elem_get('anim_menu').style.display = 'block';
+		elem_get('anim_rename_form').style.display = 'none';
+		anim_menubar_build_animation_select();
+		skrontch_update();
+	});
+	elem_listen('anim_rename_cancel', 'click', (e) => {
+		e.preventDefault(); 
+		elem_get('anim_menu').style.display = 'block';
+		elem_get('anim_rename_form').style.display = 'none';
 	});
 	// clone
-	elem_get('anim_clone').addEventListener('click', (e) => {
+	elem_listen('anim_clone', 'click', (e) => {
 		e.preventDefault();
+		elem_get('anim_menu').style.display = 'none';
+		elem_get('anim_clone_form').style.display = 'block';
+		elem_get('anim_clone_error').style.display = 'none';
+		let input = elem_get('anim_clone_input');
+		input.value = proj.anim.current;
+		requestAnimationFrame(() => {
+			input.focus()
+			input.dispatchEvent(new Event('input'));
+			input.setSelectionRange(input.value.length, input.value.length);
+		});
 	});
+	elem_listen('anim_clone_input', 'input', (e) => {
+		let input = elem_get('anim_clone_input');
+		let val = input.value;
+		for (const [title, data] of Object.entries(proj.anim.anims)) {
+			if (title == val) {
+				// display error
+				input.classList.add('error');
+				elem_get('anim_clone_error').style.display = 'inline';
+				elem_get('anim_clone_error').innerText = 'Error: Name already in use.';
+				return;
+			}
+		}
+		input.classList.remove('error');
+		elem_get('anim_clone_error').style.display = 'none';
+	});
+	elem_listen('anim_clone_input', 'keydown', (e) => {
+		if (e.key == 'Enter') elem_get('anim_clone_save').click();
+	});
+	elem_listen('anim_clone_save', 'click', (e) => {
+		e.preventDefault(); 
+		let input = elem_get('anim_clone_input');
+		if (input.classList.contains('error')) return;
+		proj.anim.anims[input.value] = obj_clone(proj.anim.anims[proj.anim.current]);
+		proj.anim.current = input.value;
+		elem_get('anim_menu').style.display = 'block';
+		elem_get('anim_clone_form').style.display = 'none';
+		anim_menubar_build_animation_select();
+		skrontch_update();
+	});
+	elem_listen('anim_clone_cancel', 'click', (e) => {
+		e.preventDefault(); 
+		elem_get('anim_menu').style.display = 'block';
+		elem_get('anim_clone_form').style.display = 'none';
+	});
+}
+
+const anim_menubar_build_animation_select = () => {
+	let anim_select = elem_get('animation_select');
+	anim_select.innerHTML = '';
+	for (const [name, data] of Object.entries(proj.anim.anims)) {
+		let option = elem_new('option');
+		console.log(name);
+		option.value = name;
+		option.innerText = name;
+		if (option.value == proj.anim.current) {
+			option.setAttribute('selected', true);
+		}
+		anim_select.appendChild(option);
+	}
 }
 
 
@@ -312,7 +397,7 @@ const anim_render_animation_form = async () => {
 		}
 		table.appendChild(row);
 	}
-	anim_form.appendChild(table);
+	anim_form.replaceChildren(table);
 	// populate form fields
 	for (const [rows, step] of animation.steps.entries()) {
 		for (const [cols, sprite] of step.sprites.entries()) {

@@ -124,5 +124,12 @@ input.error, input.error:focus {
 	z-index: 9001;
 }
 
+.error_msg { 
+	color: var(--red); 
+	background-color: var(--black);
+	font-weight: bold;
+	border-radius: 8px;
+	padding: 4px 8px;
+}
 .h_space { height: 8px; }
 .hidden { display:none; }
