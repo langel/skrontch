@@ -14,9 +14,11 @@ TO DO --
 
 */
 
+// XXX make these settable
+let sprite_count = 4;
+let step_count = 8;
 
-let sprite_count = 2;
-let step_count = 4;
+
 let anim_form;
 
 let anim_fps = 5;
@@ -60,9 +62,9 @@ const anim_init = () => {
 	// fresh session setup default animations
 	if (Object.entries(proj.anim.anims) == 0) {
 		let new_anim = obj_clone(anim_schema);
-		for (let i = 0; i < 4; i++) {
+		for (let i = 0; i < step_count; i++) {
 			let step = obj_clone(anim_step_schema);
-			for (let j = 0; j < 2; j++) {
+			for (let j = 0; j < sprite_count; j++) {
 				let sprite = obj_clone(anim_sprite_schema);
 				step.sprites.push(sprite);
 			}
@@ -122,10 +124,10 @@ const anim_init = () => {
 			out_y += "\n\thex";
 			for (const [i, step] of data.steps.entries()) {
 				for (const sprite of step.sprites) {
-					out_s += ' '+tohex(sprite.s);
-					out_a += ' '+tohex(sprite.a);
-					out_x += ' '+tohex(sprite.x);
-					out_y += ' '+tohex(sprite.y);
+					out_s += ' '+tohex(parseInt(sprite.s));
+					out_a += ' '+tohex(parseInt(sprite.a));
+					out_x += ' '+tohex(parseInt(sprite.x));
+					out_y += ' '+tohex(parseInt(sprite.y));
 				}
 			}
 		}
@@ -239,10 +241,9 @@ const anim_render_frame = () => {
 	preview.appendChild(canvas);
 	// highlight step
 	let step_rows = document.getElementsByClassName('anim_step_row');
-	let step_count = step_rows.length;
-	for (let i = 0; i < step_count; i++) {
+	for (let i = 0; i < step_rows.length; i++) {
 		step_rows[i].classList.remove('highlight');
-		if (i == anim_counter % step_count) {
+		if (i == anim_counter % step_rows.length) {
 			step_rows[i].classList.add('highlight');
 		}
 	}
