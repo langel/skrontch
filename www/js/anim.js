@@ -107,6 +107,31 @@ const anim_init = () => {
 	anim_render_chr_select();
 	// generate nes palette editor
 	nes_pal_editor_init();
+	// export tables
+	elem_listen('anim_tables_export', 'click', (e) => {
+		e.preventDefault();
+		let out_s = "char_missile_theo_spr:"
+		let out_a = "char_missile_theo_att:"
+		let out_x = "char_missile_theo_x:"
+		let out_y = "char_missile_theo_y:"
+		let anims = Object.entries(proj.anim.anims).sort();
+		for (const [name, data] of anims) {
+			out_s += "\n\thex";
+			out_a += "\n\thex";
+			out_x += "\n\thex";
+			out_y += "\n\thex";
+			for (const [i, step] of data.steps.entries()) {
+				for (const sprite of step.sprites) {
+					out_s += ' '+tohex(sprite.s);
+					out_a += ' '+tohex(sprite.a);
+					out_x += ' '+tohex(sprite.x);
+					out_y += ' '+tohex(sprite.y);
+				}
+			}
+		}
+		let output = out_s + "\n" + out_a + "\n" + out_x + "\n" + out_y + "\n";
+		elem_get('anim_output').innerText = output;
+	});
 }
 
 const anim_process = () => {
@@ -230,9 +255,7 @@ const anim_menubar_init = () => {
 	// construct animation selector
 	anim_menubar_build_animation_select();
 	elem_listen('animation_select', 'input', (e) => {
-		console.log('anim change');
 		proj.anim.current = e.target.value;
-		console.log(e.target.value);
 		animation = proj.anim.anims[proj.anim.current];
 		requestAnimationFrame(() => {
 			anim_render_animation_form();
@@ -353,8 +376,6 @@ const anim_menubar_init = () => {
 			select.remove(index);
 			select.selectedIndex = 0;
 			proj.anim.current = select.children[0].value;
-			console.log(select.children[0].value);
-			console.log(proj.anim.anims[select.children[0].value]);
 			animation = proj.anim.anims[proj.anim.current];
 			elem_get('anim_menu').style.display = 'block';
 			elem_get('anim_delete_form').style.display = 'none';
@@ -453,6 +474,9 @@ const anim_render_animation_form = async () => {
 					input_hex.value = tohex(parseInt(val));
 					animation.steps[step].sprites[sprite][attr] = val;
 					skrontch_update();
+				});
+				input_hex.addEventListener('focus', (e) => {
+					if (e.target.value == 'NaN') e.target.select();
 				});
 				input_hex.addEventListener('input', (e) => {
 					const input = e.target;

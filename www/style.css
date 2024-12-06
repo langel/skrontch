@@ -116,6 +116,15 @@ input.error, input.error:focus {
 #anim_controls div:hover {
 	cursor: pointer;
 }
+#anim_output {
+	overflow-x: auto;
+	white-space: pre-wrap;
+	font-family: monospace;
+	font-size: 0.5em;
+	background: var(--black);
+	border-radius: 8px;
+	padding: 4px 8px;
+}
 
 #droptarg {
 	position: fixed;
