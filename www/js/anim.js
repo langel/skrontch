@@ -423,8 +423,11 @@ const anim_render_animation_form = async () => {
 		row.classList.add('anim_step_row');
 		let row_meta = elem_new('td');
 		row_meta.innerHTML = 'Anim Step ' + tohex(rows);
+		// step controls
 		let clone_id = 'anim_step_'+tohex(rows)+'_clone';
 		row_meta.innerHTML += '<br><a id="'+clone_id+'" href="/anim_step_clone">clone</a>';
+		let delete_id = 'anim_step_'+tohex(rows)+'_delete';
+		row_meta.innerHTML += '<br><a id="'+delete_id+'" href="/anim_step_delete">delete</a>';
 		row.appendChild(row_meta);
 		for (const [cols, sprite] of step.sprites.entries()) {
 			let cell = elem_new('td');
@@ -459,6 +462,14 @@ const anim_render_animation_form = async () => {
 		elem_listen(clone_id, 'click', (e) => {
 			e.preventDefault();
 			animation.steps.splice(rows, 0, structuredClone(animation.steps[rows]));
+			skrontch_update();
+			anim_render_animation_form();
+		});
+		let delete_id = 'anim_step_'+tohex(rows)+'_delete';
+		elem_listen(delete_id, 'click', (e) => {
+			e.preventDefault();
+			animation.steps.splice(rows, 1);
+			skrontch_update();
 			anim_render_animation_form();
 		});
 	}
