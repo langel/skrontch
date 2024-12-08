@@ -423,6 +423,8 @@ const anim_render_animation_form = async () => {
 		row.classList.add('anim_step_row');
 		let row_meta = elem_new('td');
 		row_meta.innerHTML = 'Anim Step ' + tohex(rows);
+		let clone_id = 'anim_step_'+tohex(rows)+'_clone';
+		row_meta.innerHTML += '<br><a id="'+clone_id+'" href="/anim_step_clone">clone</a>';
 		row.appendChild(row_meta);
 		for (const [cols, sprite] of step.sprites.entries()) {
 			let cell = elem_new('td');
@@ -451,6 +453,15 @@ const anim_render_animation_form = async () => {
 		table.appendChild(row);
 	}
 	anim_form.replaceChildren(table);
+	// button functionality
+	for (const [rows, step] of animation.steps.entries()) {
+		let clone_id = 'anim_step_'+tohex(rows)+'_clone';
+		elem_listen(clone_id, 'click', (e) => {
+			e.preventDefault();
+			animation.steps.splice(rows, 0, structuredClone(animation.steps[rows]));
+			anim_render_animation_form();
+		});
+	}
 	// populate form fields
 	for (const [rows, step] of animation.steps.entries()) {
 		for (const [cols, sprite] of step.sprites.entries()) {
