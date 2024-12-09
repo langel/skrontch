@@ -15,8 +15,8 @@ TO DO --
 */
 
 // XXX make these settable
-let sprite_count = 4;
-let step_count = 8;
+let sprite_count = 2;
+let step_count = 6;
 
 
 let anim_form;
@@ -424,6 +424,10 @@ const anim_render_animation_form = async () => {
 		let row_meta = elem_new('td');
 		row_meta.innerHTML = 'Anim Step ' + tohex(rows);
 		// step controls
+		let copy_id = 'anim_step_'+tohex(rows)+'_copy';
+		row_meta.innerHTML += '<br><a id="'+copy_id+'" href="/anim_step_copy">copy</a>';
+		let paste_id = 'anim_step_'+tohex(rows)+'_paste';
+		row_meta.innerHTML += '<br><a id="'+paste_id+'" href="/anim_step_paste">paste</a>';
 		let clone_id = 'anim_step_'+tohex(rows)+'_clone';
 		row_meta.innerHTML += '<br><a id="'+clone_id+'" href="/anim_step_clone">clone</a>';
 		let delete_id = 'anim_step_'+tohex(rows)+'_delete';
@@ -458,6 +462,21 @@ const anim_render_animation_form = async () => {
 	anim_form.replaceChildren(table);
 	// button functionality
 	for (const [rows, step] of animation.steps.entries()) {
+		let copy_id = 'anim_step_'+tohex(rows)+'_copy';
+		elem_listen(copy_id, 'click', (e) => {
+			e.preventDefault();
+			let row = obj_clone(animation.steps[rows]);
+			row.row_origin = rows;
+			clipboard_set('anim_row', row);
+		});
+		let paste_id = 'anim_step_'+tohex(rows)+'_paste';
+		elem_listen(paste_id, 'click', (e) => {
+			e.preventDefault();
+			let row = clipboard_get('anim_row');
+			animation.steps[rows] = obj_clone(row);
+			skrontch_update();
+			anim_render_animation_form();
+		});
 		let clone_id = 'anim_step_'+tohex(rows)+'_clone';
 		elem_listen(clone_id, 'click', (e) => {
 			e.preventDefault();
