@@ -4,13 +4,8 @@
 TO DO --
 
 	invent skrontch project json object
-	skorntch project export/import
-	new animation button / naming field
 	edit number of sprites and steps
-	update animation json data onchange
 	generate assembly
-	preview animation
-	palette manager
 
 */
 
@@ -112,10 +107,10 @@ const anim_init = () => {
 	// export tables
 	elem_listen('anim_tables_export', 'click', (e) => {
 		e.preventDefault();
-		let out_s = "char_missile_theo_spr:"
-		let out_a = "char_missile_theo_att:"
-		let out_x = "char_missile_theo_x:"
-		let out_y = "char_missile_theo_y:"
+		let out_s = "anim_"+proj.anim.current+"_spr:"
+		let out_a = "anim_"+proj.anim.current+"_att:"
+		let out_x = "anim_"+proj.anim.current+"_x:"
+		let out_y = "anim_"+proj.anim.current+"_y:"
 		let anims = Object.entries(proj.anim.anims).sort();
 		for (const [name, data] of anims) {
 			out_s += "\n\thex";
