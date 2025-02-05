@@ -2,6 +2,14 @@
 
 const blank = "&#x2800;";
 const br = "<br>";
+const chr_backspace = String.fromCharCode(0x232b);
+const chr_dash = String.fromCharCode(0x2013);
+const chr_divide = String.fromCharCode(0xf7);
+const chr_multiply = String.fromCharCode(0xd7);
+const chr_plus_minus = String.fromCharCode(0xb1);
+const chr_shift_left = String.fromCharCode(0x226a);
+const chr_shift_right = String.fromCharCode(0x226b);
+
 
 // value convertors
 const char = (ord) => String.fromCharCode(ord);

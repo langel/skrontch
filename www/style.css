@@ -9,14 +9,32 @@
 	--darker: #1e1e24;
 	--black:  #130f17;
 }
+
+/* CSS RESET */
+*, *::before, *::after { box-sizing: border-box; }
+* { margin: 0; }
 html, body {
 	background: var(--black);
 	color: var(--light);
 	margin: 0;
 	padding: 0;
-	font-family: sans-serif;
+	font-family: "Jost", sans-serif;
+	font-optical-sizing: auto;
+	font-weight: 400;
+	font-style: normal;
+	-webkit-font-smoothing: antialiased;
+	line-height: calc(1em + 0.5rem);
 }
-* { box-sizing: border-box; }
+img, picture, video, canvas, svg {
+	display: block;
+	max-width: 100%;
+}
+input, button, textarea, select { font: inherit; }
+p, h1, h2, h3, h4, h5, h6 { overflow-wrap: break-word; }
+p { text-wrap: pretty; }
+h1, h2, h3, h4, h5, h6 { text-wrap: balance; }
+
+/* SKRONTCH GENERAL STLYE */
 a {
 	color: var(--yellow);
 }
