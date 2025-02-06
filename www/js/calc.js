@@ -6,8 +6,13 @@ const calculator = (id) => {
 	const calc = (lhs, op, rhs) =>
 		!op || lhs === null ? rhs :
 		op === "+" ? lhs + rhs :
-		op === "-" ? lhs - rhs :
-		op === "x" ? lhs * rhs : lhs / rhs;
+		op === chr_dash ? lhs - rhs :
+		op === chr_multiply ? lhs * rhs : 
+		op === chr_divide ? lhs / rhs :
+		op === "&" ? lhs & rhs :
+		op === "|" ? lhs | rhs :
+		op === "^" ? lhs ^ rhs :
+		op === "%" ? lhs % rhs : 0;
 
 	const onclick = e => {
 		const str = e.target.innerText;
@@ -16,8 +21,10 @@ const calculator = (id) => {
 		}
 		else if (str === "AC") lhs.val = op = null, rhs.val = 0
 		else if (str === "+/-" && rhs.val) rhs.val = -rhs.val
-		else if (str === "%" && rhs.val) rhs.val *= 0.01
-		else if (str === "+" || str === "-" || str === "x" || str === "÷") {
+		else if (str === "~" && rhs.val) ~ rhs.val
+		else if (str == chr_shift_left) rhs.val <<= 1;
+		else if (str == chr_shift_right) rhs.val >>>= 1;
+		else if (["+", chr_dash, chr_multiply, chr_divide, "&", "|", "^", "%"].includes(str)) {
 			if (rhs.val !== null) lhs.val = calc(lhs.val, op, Number(rhs.val)), rhs.val = null
 			op = str
 		} 
@@ -37,6 +44,11 @@ const calculator = (id) => {
 				Button(chr_shift_left), 
 				Button(chr_shift_right), 
 				Button(chr_backspace, "Backspace")),
+			div(
+				Button("&"),
+				Button("|"),
+				Button("^"),
+				Button("~")), 
 			div(
 				Button("D"),
 				Button("E"),
@@ -72,4 +84,4 @@ const calculator = (id) => {
 	)
 }
 
-van.add(document.getElementsByTagName('main')[0], calculator())
+van.add(document.getElementById('calc'), calculator())
