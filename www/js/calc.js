@@ -16,6 +16,7 @@ const calculator = (id) => {
 
 	const onclick = e => {
 		const str = e.target.innerText;
+		console.log('wewew', str, e);
 		if (str >= "0" && str <= "9") {
 			typeof rhs.val === "string" ? rhs.val += str : rhs.val = rhs.val * 10 + Number(str)
 		}
@@ -37,7 +38,7 @@ const calculator = (id) => {
 	const Button = (str, key) => div({class: "button", key: key}, button(str))
 
 	return div({id: "calculator-" + id, class: "calculator"},
-		div({class: "display"}, div(() => rhs.val ?? lhs.val)),
+		div({class: "display mono"}, div(() => rhs.val ?? lhs.val)),
 		div({class: "panel", onclick},
 			div(
 				Button("AC"), 
