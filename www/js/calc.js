@@ -37,51 +37,66 @@ const calculator = (id) => {
 
 	const Button = (str, key) => div({class: "button", key: key}, button(str))
 
+	const keys = [
+		// row 1
+		[ 'AC', 'escape', 'all_clear' ],
+		[ chr_shift_left, '<', 'shift_left' ],
+		[ chr_shift_right, '>', 'shift_right' ],
+		[ chr_backspace, 'backspace', 'backspace' ],
+		// row 2
+		[ '&', '&', 'and' ],
+		[ '|', '|', 'or' ],
+		[ '^', '^', 'xor' ],
+		[ '~', '~', 'not' ],
+		// row 3
+		[ 'D', 'd', 'd' ],
+		[ 'E', 'e', 'e' ],
+		[ 'F', 'f', 'f' ],
+		[ '%', '%', 'modulo' ],
+		// row 4
+		[ 'A', 'a', 'a' ],
+		[ 'B', 'b', 'b' ],
+		[ 'C', 'c', 'c' ],
+		[ chr_divide, '/', 'divide' ],
+		// row 5
+		[ '7', '7', '7' ],
+		[ '8', '8', '8' ],
+		[ '9', '9', '9' ],
+		[ chr_multiply, '*', 'multiply' ],
+		// row 6
+		[ '4', '4', '4' ],
+		[ '5', '5', '5' ],
+		[ '6', '6', '6' ],
+		[ chr_dash, '-', 'minus' ],
+		// row 7
+		[ '1', '1', '1' ],
+		[ '2', '2', '2' ],
+		[ '3', '3', '3' ],
+		[ '+', '+', 'plus' ],
+		// row 8
+		[ chr_plus_minus, 'i', 'invert' ],
+		[ '0', '0', '0' ],
+		[ '.', '.', 'dot' ],
+		[ '=', '=', 'equals' ],
+	];
+
+	let key_buttons = [];
+	for (let i = 0; i < keys.length; i++) {
+		key_buttons.push(Button(keys[i][0], keys[i][1]));
+	}
+	let key_rows = [];
+	for (let i = 0; i < key_buttons.length / 4; i++) {
+		key_rows.push(div(
+			key_buttons[i * 4 + 0],
+			key_buttons[i * 4 + 1],
+			key_buttons[i * 4 + 2],
+			key_buttons[i * 4 + 3],
+		));
+	}
+
 	return div({id: "calculator-" + id, class: "calculator"},
 		div({class: "display mono"}, div(() => rhs.val ?? lhs.val)),
-		div({class: "panel", onclick},
-			div(
-				Button("AC"), 
-				Button(chr_shift_left), 
-				Button(chr_shift_right), 
-				Button(chr_backspace, "Backspace")),
-			div(
-				Button("&"),
-				Button("|"),
-				Button("^"),
-				Button("~")), 
-			div(
-				Button("D"),
-				Button("E"),
-				Button("F"),
-				Button("%")), 
-			div(
-				Button("A"),
-				Button("B"),
-				Button("C"),
-				Button(chr_divide, "/")),
-			div(
-				Button("7"), 
-				Button("8"), 
-				Button("9"), 
-				Button(chr_multiply)),
-			div(
-				Button("4"), 
-				Button("5"), 
-				Button("6"), 
-				Button(chr_dash)),
-			div(
-				Button("1"), 
-				Button("2"), 
-				Button("3"), 
-				Button("+")),
-			div(
-				//div({class: "button wide"}, 
-				Button(chr_plus_minus, "-"), 
-				Button("0"), 
-				Button("."), 
-				Button("=")),
-		),
+		div({class: "keypad", onclick}, ...key_rows),
 	)
 }
 
