@@ -74,10 +74,12 @@ const calculator = (id) => {
 		[ '3', '3', '3' ],
 		[ '+', '+', 'plus' ],
 		// row 8
-		[ chr_plus_minus, 'i', 'invert' ],
+		[ chr_plus_minus, 'n', 'negate' ],
 		[ '0', '0', '0' ],
 		[ '.', '.', 'dot' ],
 		[ '=', '=', 'equals' ],
+		// more buttons?
+		// 1/x reciprocal (inverse)
 	];
 
 	let key_buttons = [];
