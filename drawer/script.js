@@ -1,15 +1,3 @@
-// NES Color Palette (56 colors)
-const nesPalette = [
-    '#7C7C7C', '#0000FC', '#0000BC', '#4428BC', '#940084', '#A80020', '#A81000', '#881400',
-    '#503000', '#007800', '#006800', '#005800', '#004058', '#000000', '#000000', '#000000',
-    '#BCBCBC', '#0078F8', '#0058F8', '#6844FC', '#D800CC', '#E40058', '#F83800', '#E45C10',
-    '#AC7C00', '#00B800', '#00A800', '#00A844', '#008888', '#000000', '#000000', '#000000',
-    '#F8F8F8', '#3CBCFC', '#6888FC', '#9878F8', '#F878F8', '#F85898', '#F87858', '#FCA044',
-    '#F8B800', '#B8F818', '#58D854', '#58F898', '#00E8D8', '#787878', '#000000', '#000000',
-    '#FCFCFC', '#A4E4FC', '#B8B8F8', '#D8B8F8', '#F8B8F8', '#F8A4C0', '#F0D0B0', '#FCE0A8',
-    '#F8D878', '#D8F878', '#B8F8B8', '#B8F8D8', '#00FCFC', '#F8D8F8', '#000000', '#000000'
-];
-
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('drawingCanvas');
     const grid_canvas = document.getElementById('gridCanvas');
@@ -28,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const brush_size_input = document.getElementById('brushSize');
     const brush_size_value = document.getElementById('brushSizeValue');
     const toggle_grid_button = document.getElementById('toggleGrid');
+    const reduce_colors_button = document.getElementById('reduceColors');
     
     // Tool buttons
     const pencil_tool = document.getElementById('pencilTool');
@@ -82,10 +71,19 @@ document.addEventListener('DOMContentLoaded', () => {
     toggle_grid_button.addEventListener('click', () => {
         show_grid = !show_grid;
         draw_grid();
+        // Save grid state to localStorage
+        localStorage.setItem('showGrid', show_grid);
     });
 
+    // Load grid state from localStorage
+    const saved_grid_state = localStorage.getItem('showGrid');
+    if (saved_grid_state !== null) {
+        show_grid = saved_grid_state === 'true';
+        draw_grid();
+    }
+
     // Create color palette
-    nesPalette.forEach(color => {
+    nes_palette.forEach(color => {
         const swatch = document.createElement('div');
         swatch.className = 'color-swatch';
         swatch.style.backgroundColor = color;
@@ -103,7 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (swatch) {
             swatch.classList.add('selected');
         }
-    } else {
+    }
+    else {
         // Select first color by default if no stored color
         const first_swatch = document.querySelector('.color-swatch');
         if (first_swatch) {
@@ -160,6 +159,12 @@ document.addEventListener('DOMContentLoaded', () => {
     canvas.addEventListener('mousemove', draw);
     canvas.addEventListener('mouseup', stop_drawing);
     canvas.addEventListener('mouseout', handle_mouse_out);
+    canvas.addEventListener('mouseenter', (e) => {
+        // Check if any mouse button is pressed (buttons property is a bitmask)
+        if (e.buttons === 0) {
+            is_drawing = false;
+        }
+    });
 
     function get_canvas_coordinates(e) {
         const rect = canvas.getBoundingClientRect();
@@ -179,9 +184,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (current_tool === 'bucket') {
             flood_fill(coords.x, coords.y);
-        } else if (current_tool === 'marquee') {
+        }
+        else if (current_tool === 'marquee') {
             selection = { x: coords.x, y: coords.y, width: 0, height: 0 };
-        } else {
+        }
+        else {
             draw(e);
         }
     }
@@ -197,7 +204,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (current_tool === 'pencil') {
                 ctx.fillStyle = selected_color;
                 ctx.fillRect(x0, y0, 1, 1);
-            } else if (current_tool === 'brush') {
+            }
+            else if (current_tool === 'brush') {
                 const half_size = Math.floor(brush_size / 2);
                 for (let y = -half_size; y <= half_size; y++) {
                     for (let x = -half_size; x <= half_size; x++) {
@@ -228,7 +236,8 @@ document.addEventListener('DOMContentLoaded', () => {
             draw_line(last_x, last_y, coords.x, coords.y);
             last_x = coords.x;
             last_y = coords.y;
-        } else if (current_tool === 'marquee') {
+        }
+        else if (current_tool === 'marquee') {
             // Update selection rectangle
             selection.width = coords.x - selection.x;
             selection.height = coords.y - selection.y;
@@ -292,37 +301,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         ctx.putImageData(image_data, 0, 0);
-    }
-
-    function get_pixel_color(image_data, x, y) {
-        const i = (y * image_data.width + x) * 4;
-        return {
-            r: image_data.data[i],
-            g: image_data.data[i + 1],
-            b: image_data.data[i + 2],
-            a: image_data.data[i + 3]
-        };
-    }
-
-    function set_pixel_color(image_data, x, y, color) {
-        const i = (y * image_data.width + x) * 4;
-        image_data.data[i] = color.r;
-        image_data.data[i + 1] = color.g;
-        image_data.data[i + 2] = color.b;
-        image_data.data[i + 3] = 255;
-    }
-
-    function colors_match(c1, c2) {
-        return c1.r === c2.r && c1.g === c2.g && c1.b === c2.b;
-    }
-
-    function hex_to_rgb(hex) {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : null;
     }
 
     function draw_selection() {
@@ -468,5 +446,79 @@ document.addEventListener('DOMContentLoaded', () => {
                 draw_grid();
                 break;
         }
+    });
+
+    // Reduce colors to 4 max
+    reduce_colors_button.addEventListener('click', () => {
+        const image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        
+        // Process each grid cell (48x48 pixels)
+        for (let grid_y = 0; grid_y < canvas.height; grid_y += 48) {
+            for (let grid_x = 0; grid_x < canvas.width; grid_x += 48) {
+                const colors = new Set();
+                const color_counts = new Map();
+                
+                // Collect colors and their frequencies within this grid cell
+                for (let y = grid_y; y < Math.min(grid_y + 48, canvas.height); y++) {
+                    for (let x = grid_x; x < Math.min(grid_x + 48, canvas.width); x++) {
+                        const color = get_pixel_color(image_data, x, y);
+                        const color_str = `${color.r},${color.g},${color.b}`;
+                        colors.add(color_str);
+                        color_counts.set(color_str, (color_counts.get(color_str) || 0) + 1);
+                    }
+                }
+                
+                // If we already have 4 or fewer colors in this cell, skip it
+                if (colors.size <= 4) continue;
+                
+                // Sort colors by frequency and take top 4
+                const sorted_colors = Array.from(color_counts.entries())
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 4);
+                
+                // Create a map of old colors to new colors for this cell
+                const color_map = new Map();
+                for (let [color_str, _] of color_counts.entries()) {
+                    if (!sorted_colors.some(([c, _]) => c === color_str)) {
+                        // Find the closest color from the top 4
+                        const [r, g, b] = color_str.split(',').map(Number);
+                        let min_dist = Infinity;
+                        let closest_color = null;
+                        
+                        for (let [target_str, _] of sorted_colors) {
+                            const [tr, tg, tb] = target_str.split(',').map(Number);
+                            const dist = Math.sqrt(
+                                Math.pow(r - tr, 2) +
+                                Math.pow(g - tg, 2) +
+                                Math.pow(b - tb, 2)
+                            );
+                            
+                            if (dist < min_dist) {
+                                min_dist = dist;
+                                closest_color = target_str;
+                            }
+                        }
+                        
+                        color_map.set(color_str, closest_color);
+                    }
+                }
+                
+                // Apply the color reduction within this grid cell
+                for (let y = grid_y; y < Math.min(grid_y + 48, canvas.height); y++) {
+                    for (let x = grid_x; x < Math.min(grid_x + 48, canvas.width); x++) {
+                        const color = get_pixel_color(image_data, x, y);
+                        const color_str = `${color.r},${color.g},${color.b}`;
+                        
+                        if (color_map.has(color_str)) {
+                            const [r, g, b] = color_map.get(color_str).split(',').map(Number);
+                            set_pixel_color(image_data, x, y, { r, g, b });
+                        }
+                    }
+                }
+            }
+        }
+        
+        ctx.putImageData(image_data, 0, 0);
+        update_local_storage();
     });
 }); 

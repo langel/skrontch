@@ -218,4 +218,12 @@ footer {
 
 .grid-toggle button {
     width: 100%;
+}
+
+.reduce-colors {
+    margin-top: 1rem;
+}
+
+.reduce-colors button {
+    width: 100%;
 } 
