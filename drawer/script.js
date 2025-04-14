@@ -448,77 +448,145 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Reduce colors to 4 max
+    // Reduce colors to 4 palettes with shared first color
     reduce_colors_button.addEventListener('click', () => {
-        const image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const loading_overlay = document.getElementById('loadingOverlay');
+        loading_overlay.style.display = 'flex';
+
+        // Use setTimeout to allow the UI to update before starting the heavy processing
+        setTimeout(() => {
+            const image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const color_counts = new Map();
+            
+            // First pass: collect all colors and their frequencies, converting to closest NES colors
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const color = get_pixel_color(image_data, x, y);
+                    // Find closest NES color
+                    const nes_color = find_closest_nes_color(color);
+                    const color_str = `${nes_color.r},${nes_color.g},${nes_color.b}`;
+                    color_counts.set(color_str, (color_counts.get(color_str) || 0) + 1);
+                }
+            }
+            
+            // Find the most common NES color (this will be our shared color)
+            const sorted_colors = Array.from(color_counts.entries())
+                .sort((a, b) => b[1] - a[1]);
+            const shared_color = sorted_colors[0][0];
+            
+            // Remove the shared color from the counts
+            color_counts.delete(shared_color);
+            
+            // Sort remaining NES colors by frequency
+            const remaining_colors = Array.from(color_counts.entries())
+                .sort((a, b) => b[1] - a[1]);
+            
+            // Create 4 palettes, each with the shared color and 3 unique NES colors
+            current_palettes = [];
+            for (let i = 0; i < 4; i++) {
+                const palette = [shared_color];
+                // Take 3 unique NES colors for this palette
+                for (let j = 0; j < 3; j++) {
+                    const color_index = i * 3 + j;
+                    if (color_index < remaining_colors.length) {
+                        palette.push(remaining_colors[color_index][0]);
+                    } else {
+                        // If we run out of unique colors, use the shared color
+                        palette.push(shared_color);
+                    }
+                }
+                current_palettes.push(palette);
+            }
+
+            // Update the canvas with the reduced NES colors
+            const new_image_data = ctx.createImageData(canvas.width, canvas.height);
+            for (let y = 0; y < canvas.height; y++) {
+                for (let x = 0; x < canvas.width; x++) {
+                    const color = get_pixel_color(image_data, x, y);
+                    const nes_color = find_closest_nes_color(color);
+                    const pixel_index = (y * canvas.width + x) * 4;
+                    new_image_data.data[pixel_index] = nes_color.r;
+                    new_image_data.data[pixel_index + 1] = nes_color.g;
+                    new_image_data.data[pixel_index + 2] = nes_color.b;
+                    new_image_data.data[pixel_index + 3] = 255;
+                }
+            }
+            ctx.putImageData(new_image_data, 0, 0);
+
+            // Save palettes to localStorage
+            localStorage.setItem('reducedPalettes', JSON.stringify(current_palettes));
+
+            // Display the generated palettes
+            const palettes_container = document.getElementById('generatedPalettes');
+            palettes_container.innerHTML = '';
+            
+            current_palettes.forEach((palette, index) => {
+                const palette_display = document.createElement('div');
+                palette_display.className = 'palette-display';
+                
+                const title = document.createElement('div');
+                title.className = 'palette-title';
+                title.textContent = `Palette ${index + 1}`;
+                palette_display.appendChild(title);
+                
+                const colors_container = document.createElement('div');
+                colors_container.className = 'palette-colors';
+                
+                palette.forEach((color_str, color_index) => {
+                    const color_div = document.createElement('div');
+                    color_div.className = 'palette-color';
+                    if (color_index === 0) {
+                        color_div.classList.add('shared-color');
+                    }
+                    
+                    const [r, g, b] = color_str.split(',').map(Number);
+                    color_div.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+                    
+                    // Add tooltip with NES palette color index
+                    const nes_color_index = nes_palette.findIndex(palette_color => 
+                        palette_color.r === r && 
+                        palette_color.g === g && 
+                        palette_color.b === b
+                    );
+                    if (nes_color_index !== -1) {
+                        const color_id = nes_color_index.toString(16).toUpperCase().padStart(2, '0');
+                        color_div.title = `Color $${color_id}`;
+                    }
+                    
+                    colors_container.appendChild(color_div);
+                });
+                
+                palette_display.appendChild(colors_container);
+                palettes_container.appendChild(palette_display);
+            });
+
+            // Hide the loading overlay
+            loading_overlay.style.display = 'none';
+        }, 100);
+    });
+
+    // Function to find the closest NES color
+    function find_closest_nes_color(color) {
+        let min_distance = Infinity;
+        let closest_color = null;
         
-        // Process each grid cell (48x48 pixels)
-        for (let grid_y = 0; grid_y < canvas.height; grid_y += 48) {
-            for (let grid_x = 0; grid_x < canvas.width; grid_x += 48) {
-                const colors = new Set();
-                const color_counts = new Map();
-                
-                // Collect colors and their frequencies within this grid cell
-                for (let y = grid_y; y < Math.min(grid_y + 48, canvas.height); y++) {
-                    for (let x = grid_x; x < Math.min(grid_x + 48, canvas.width); x++) {
-                        const color = get_pixel_color(image_data, x, y);
-                        const color_str = `${color.r},${color.g},${color.b}`;
-                        colors.add(color_str);
-                        color_counts.set(color_str, (color_counts.get(color_str) || 0) + 1);
-                    }
-                }
-                
-                // If we already have 4 or fewer colors in this cell, skip it
-                if (colors.size <= 4) continue;
-                
-                // Sort colors by frequency and take top 4
-                const sorted_colors = Array.from(color_counts.entries())
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 4);
-                
-                // Create a map of old colors to new colors for this cell
-                const color_map = new Map();
-                for (let [color_str, _] of color_counts.entries()) {
-                    if (!sorted_colors.some(([c, _]) => c === color_str)) {
-                        // Find the closest color from the top 4
-                        const [r, g, b] = color_str.split(',').map(Number);
-                        let min_dist = Infinity;
-                        let closest_color = null;
-                        
-                        for (let [target_str, _] of sorted_colors) {
-                            const [tr, tg, tb] = target_str.split(',').map(Number);
-                            const dist = Math.sqrt(
-                                Math.pow(r - tr, 2) +
-                                Math.pow(g - tg, 2) +
-                                Math.pow(b - tb, 2)
-                            );
-                            
-                            if (dist < min_dist) {
-                                min_dist = dist;
-                                closest_color = target_str;
-                            }
-                        }
-                        
-                        color_map.set(color_str, closest_color);
-                    }
-                }
-                
-                // Apply the color reduction within this grid cell
-                for (let y = grid_y; y < Math.min(grid_y + 48, canvas.height); y++) {
-                    for (let x = grid_x; x < Math.min(grid_x + 48, canvas.width); x++) {
-                        const color = get_pixel_color(image_data, x, y);
-                        const color_str = `${color.r},${color.g},${color.b}`;
-                        
-                        if (color_map.has(color_str)) {
-                            const [r, g, b] = color_map.get(color_str).split(',').map(Number);
-                            set_pixel_color(image_data, x, y, { r, g, b });
-                        }
-                    }
-                }
+        for (let i = 0; i < nes_palette.length; i++) {
+            const nes_color = hex_to_rgb(nes_palette[i]);
+            const distance = color_distance(color, nes_color);
+            if (distance < min_distance) {
+                min_distance = distance;
+                closest_color = nes_color;
             }
         }
         
-        ctx.putImageData(image_data, 0, 0);
-        update_local_storage();
-    });
+        return closest_color;
+    }
+    
+    // Function to calculate color distance (using Euclidean distance in RGB space)
+    function color_distance(color1, color2) {
+        const dr = color1.r - color2.r;
+        const dg = color1.g - color2.g;
+        const db = color1.b - color2.b;
+        return dr * dr + dg * dg + db * db;
+    }
 }); 
