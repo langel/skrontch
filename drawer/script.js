@@ -38,6 +38,18 @@ document.addEventListener('DOMContentLoaded', () => {
     let last_x, last_y;
     let show_grid = false;
 
+    // Initialize current_palettes from localStorage
+    let current_palettes = [];
+    try {
+        const saved_palettes = localStorage.getItem('reducedPalettes');
+        if (saved_palettes) {
+            current_palettes = JSON.parse(saved_palettes);
+        }
+    } catch (e) {
+        console.error('Error loading palettes from localStorage:', e);
+        current_palettes = [];
+    }
+
     // Initialize canvas with NES color 0x0F background
     ctx.fillStyle = '#004058';  // NES color 0x0F
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -589,4 +601,309 @@ document.addEventListener('DOMContentLoaded', () => {
         const db = color1.b - color2.b;
         return dr * dr + dg * dg + db * db;
     }
+
+    // Export NES data
+    const export_nes_button = document.getElementById('exportNESData');
+    const chr_link = document.getElementById('chrLink');
+    const nametable_link = document.getElementById('nametableLink');
+    const export_links = document.getElementById('exportLinks');
+    const chr_preview = document.getElementById('chrPreview');
+    const reconstructed_preview = document.getElementById('reconstructedPreview');
+    const chr_preview_ctx = chr_preview.getContext('2d');
+    const reconstructed_preview_ctx = reconstructed_preview.getContext('2d');
+
+    export_nes_button.addEventListener('click', () => {
+        if (!current_palettes) {
+            alert('Please reduce colors first before exporting NES data');
+            return;
+        }
+
+        // Show loading overlay
+        const loading_overlay = document.getElementById('loadingOverlay');
+        loading_overlay.style.display = 'flex';
+        loading_overlay.querySelector('.loading-text').textContent = 'Generating NES data...';
+
+        // Use setTimeout to allow the UI to update before starting the heavy processing
+        setTimeout(() => {
+            // Get the current canvas data
+            const image_data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Create a map of unique 8x8 tiles
+            const tiles = new Map();
+            const tile_map = new Uint8Array(32 * 30); // 32x30 tile map
+            const attribute_table = new Uint8Array(64); // 8x8 attribute table (2x2 tile regions)
+            
+            // Process the image in 8x8 pixel tiles
+            for (let tile_y = 0; tile_y < 30; tile_y++) {
+                for (let tile_x = 0; tile_x < 32; tile_x++) {
+                    // Extract the 8x8 tile
+                    const tile_data = new Uint8Array(64); // 8x8 pixels
+                    for (let y = 0; y < 8; y++) {
+                        for (let x = 0; x < 8; x++) {
+                            const pixel_x = tile_x * 8 + x;
+                            const pixel_y = tile_y * 8 + y;
+                            const color = get_pixel_color(image_data, pixel_x, pixel_y);
+                            
+                            // Find which palette this color belongs to
+                            let palette_index = 0;
+                            for (let i = 0; i < current_palettes.length; i++) {
+                                const palette = current_palettes[i];
+                                if (palette.some(c => {
+                                    const [r, g, b] = c.split(',').map(Number);
+                                    return r === color.r && g === color.g && b === color.b;
+                                })) {
+                                    palette_index = i;
+                                    break;
+                                }
+                            }
+                            
+                            // Store the color index in the tile (0-3)
+                            const color_index = current_palettes[palette_index].findIndex(c => {
+                                const [r, g, b] = c.split(',').map(Number);
+                                return r === color.r && g === color.g && b === color.b;
+                            });
+                            tile_data[y * 8 + x] = color_index;
+                            
+                            // Update attribute table (2x2 tile regions)
+                            if (x % 2 === 0 && y % 2 === 0) {
+                                const attr_x = Math.floor(tile_x / 2);
+                                const attr_y = Math.floor(tile_y / 2);
+                                const attr_index = attr_y * 8 + attr_x;
+                                attribute_table[attr_index] = palette_index;
+                            }
+                        }
+                    }
+                    
+                    // Convert tile data to NES format (2 bit planes)
+                    const tile_bytes = new Uint8Array(16);
+                    for (let y = 0; y < 8; y++) {
+                        let low_byte = 0;
+                        let high_byte = 0;
+                        for (let x = 0; x < 8; x++) {
+                            const color_index = tile_data[y * 8 + x];
+                            low_byte |= ((color_index >> 0) & 1) << (7 - x);
+                            high_byte |= ((color_index >> 1) & 1) << (7 - x);
+                        }
+                        tile_bytes[y] = low_byte;
+                        tile_bytes[y + 8] = high_byte;
+                    }
+                    
+                    // Check if this tile already exists
+                    let tile_index = -1;
+                    for (const [index, existing_tile] of tiles.entries()) {
+                        let match = true;
+                        for (let i = 0; i < 16; i++) {
+                            if (existing_tile[i] !== tile_bytes[i]) {
+                                match = false;
+                                break;
+                            }
+                        }
+                        if (match) {
+                            tile_index = index;
+                            break;
+                        }
+                    }
+                    
+                    // If tile doesn't exist, add it
+                    if (tile_index === -1) {
+                        tile_index = tiles.size;
+                        tiles.set(tile_index, tile_bytes);
+                    }
+                    
+                    // Store tile index in tile map
+                    tile_map[tile_y * 32 + tile_x] = tile_index;
+                }
+            }
+            
+            // Create CHR data (all unique tiles)
+            const chr_data = new Uint8Array(tiles.size * 16);
+            for (const [index, tile] of tiles.entries()) {
+                chr_data.set(tile, index * 16);
+            }
+            
+            // Create name table data (tile map + attribute table)
+            const name_table_data = new Uint8Array(1024); // 1KB name table
+            name_table_data.set(tile_map, 0); // First 960 bytes are tile map
+            name_table_data.set(attribute_table, 960); // Last 64 bytes are attribute table
+            
+            // Create Blob URLs for the data
+            const chr_blob = new Blob([chr_data], { type: 'application/octet-stream' });
+            const name_table_blob = new Blob([name_table_data], { type: 'application/octet-stream' });
+            
+            // Update the links with download attributes
+            chr_link.href = URL.createObjectURL(chr_blob);
+            chr_link.download = 'pattern_table.chr';
+            nametable_link.href = URL.createObjectURL(name_table_blob);
+            nametable_link.download = 'name_table.nam';
+            
+            // Render CHR preview
+            chr_preview_ctx.clearRect(0, 0, chr_preview.width, chr_preview.height);
+            const tiles_per_row = Math.floor(chr_preview.width / 8);
+            
+            // Ensure we have valid palettes to work with
+            if (!current_palettes || current_palettes.length === 0) {
+                console.error('No palettes available for CHR preview');
+                return;
+            }
+            
+            // Create a default palette as fallback
+            const default_palette = ['0,0,0', '0,0,0', '0,0,0', '0,0,0'];
+            
+            for (const [index, tile] of tiles.entries()) {
+                const tile_x = (index % tiles_per_row) * 8;
+                const tile_y = Math.floor(index / tiles_per_row) * 8;
+                
+                // Get the palette for this tile - use a default palette if we can't determine it
+                let palette_index = 0;
+                let palette = current_palettes[0] || default_palette;
+                
+                // Try to find the palette used by this tile in the original image
+                for (let tile_y_img = 0; tile_y_img < 30; tile_y_img++) {
+                    for (let tile_x_img = 0; tile_x_img < 32; tile_x_img++) {
+                        if (tile_map[tile_y_img * 32 + tile_x_img] === index) {
+                            const attr_x = Math.floor(tile_x_img / 2);
+                            const attr_y = Math.floor(tile_y_img / 2);
+                            const attr_index = attr_y * 8 + attr_x;
+                            if (attr_index < attribute_table.length) {
+                                palette_index = attribute_table[attr_index];
+                                if (palette_index < current_palettes.length) {
+                                    palette = current_palettes[palette_index];
+                                }
+                            }
+                            break;
+                        }
+                    }
+                    if (palette_index !== 0) break;
+                }
+                
+                // Ensure palette has all required colors
+                if (!palette || palette.length < 4) {
+                    palette = default_palette;
+                }
+                
+                // Render the tile
+                for (let y = 0; y < 8; y++) {
+                    for (let x = 0; x < 8; x++) {
+                        const low_bit = (tile[y] >> (7 - x)) & 1;
+                        const high_bit = (tile[y + 8] >> (7 - x)) & 1;
+                        const color_index = (high_bit << 1) | low_bit;
+                        
+                        // Ensure color_index is within bounds
+                        const safe_color_index = Math.min(color_index, palette.length - 1);
+                        const [r, g, b] = palette[safe_color_index].split(',').map(Number);
+                        chr_preview_ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                        chr_preview_ctx.fillRect(tile_x + x, tile_y + y, 1, 1);
+                    }
+                }
+            }
+            
+            // Render reconstructed image
+            reconstructed_preview_ctx.clearRect(0, 0, reconstructed_preview.width, reconstructed_preview.height);
+            
+            // Ensure we have valid palettes to work with
+            if (!current_palettes || current_palettes.length === 0) {
+                console.error('No palettes available for rendering');
+                return;
+            }
+            
+            // Create a default palette as fallback
+            const default_palette_render = ['0,0,0', '0,0,0', '0,0,0', '0,0,0'];
+            
+            for (let tile_y = 0; tile_y < 30; tile_y++) {
+                for (let tile_x = 0; tile_x < 32; tile_x++) {
+                    const tile_index = tile_map[tile_y * 32 + tile_x];
+                    const tile = tiles.get(tile_index);
+                    
+                    // Get the palette for this tile - use a default palette if we can't determine it
+                    let palette_index = 0;
+                    let palette = current_palettes[0] || default_palette_render;
+                    
+                    // Try to find the palette used by this tile in the original image
+                    const attr_x = Math.floor(tile_x / 2);
+                    const attr_y = Math.floor(tile_y / 2);
+                    const attr_index = attr_y * 8 + attr_x;
+                    
+                    if (attr_index < attribute_table.length) {
+                        palette_index = attribute_table[attr_index];
+                        if (palette_index < current_palettes.length) {
+                            palette = current_palettes[palette_index];
+                        }
+                    }
+                    
+                    // Ensure palette has all required colors
+                    if (!palette || palette.length < 4) {
+                        palette = default_palette_render;
+                    }
+                    
+                    // Render the tile
+                    for (let y = 0; y < 8; y++) {
+                        for (let x = 0; x < 8; x++) {
+                            const low_bit = (tile[y] >> (7 - x)) & 1;
+                            const high_bit = (tile[y + 8] >> (7 - x)) & 1;
+                            const color_index = (high_bit << 1) | low_bit;
+                            
+                            // Ensure color_index is within bounds
+                            const safe_color_index = Math.min(color_index, palette.length - 1);
+                            const [r, g, b] = palette[safe_color_index].split(',').map(Number);
+                            reconstructed_preview_ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                            reconstructed_preview_ctx.fillRect(tile_x * 8 + x, tile_y * 8 + y, 1, 1);
+                        }
+                    }
+                }
+            }
+            
+            // Show the export links section
+            export_links.style.display = 'block';
+            
+            // Hide the loading overlay
+            loading_overlay.style.display = 'none';
+        }, 100);
+    });
+
+    // Add new session button functionality
+    const new_session_button = document.getElementById('newSession');
+    new_session_button.addEventListener('click', () => {
+        if (confirm('Are you sure you want to start a new session? This will clear all saved data and reset the canvas.')) {
+            // Clear localStorage
+            localStorage.removeItem('canvasImage');
+            localStorage.removeItem('selectedColor');
+            localStorage.removeItem('selectedTool');
+            localStorage.removeItem('brushSize');
+            localStorage.removeItem('showGrid');
+            localStorage.removeItem('reducedPalettes');
+            
+            // Reset canvas
+            ctx.fillStyle = '#004058';  // NES color 0x0F
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Reset grid
+            show_grid = false;
+            draw_grid();
+            
+            // Reset palettes
+            current_palettes = [];
+            const palettes_container = document.getElementById('generatedPalettes');
+            palettes_container.innerHTML = '';
+            
+            // Reset export links
+            const export_links = document.getElementById('exportLinks');
+            export_links.style.display = 'none';
+            
+            // Reset tool selection
+            set_active_tool('pencil');
+            
+            // Reset brush size
+            brush_size = 1;
+            brush_size_input.value = brush_size;
+            brush_size_value.textContent = brush_size;
+            
+            // Reset color selection to first color
+            const first_swatch = document.querySelector('.color-swatch');
+            if (first_swatch) {
+                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+                first_swatch.classList.add('selected');
+                selected_color = first_swatch.dataset.color;
+            }
+        }
+    });
 }); 

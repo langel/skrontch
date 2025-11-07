@@ -49,6 +49,9 @@
             <div class="reduce-colors">
                 <button id="reduceColors">Reduce Colors</button>
             </div>
+            <div class="export-nes">
+                <button id="exportNESData">Export NES Data</button>
+            </div>
         </div>
         <div class="canvas-container">
             <div class="canvas-wrapper">
@@ -60,13 +63,30 @@
                 </div>
             </div>
             <div class="canvas-tools">
-                <button id="clearCanvas">Clear</button>
-                <button id="saveImage">Save</button>
-                <input type="file" id="loadImage" accept="image/*" style="display: none;" />
-                <label for="loadImage" class="tool-button">Load Image</label>
+                <button id="clearCanvas">Clear Canvas</button>
+                <button id="saveImage">Save Image</button>
+                <button id="loadImage">Load Image</button>
+                <button id="newSession">New Session</button>
             </div>
             <div class="palette-container" id="nesPalette"></div>
             <div class="generated-palettes" id="generatedPalettes"></div>
+            <div class="export-links" id="exportLinks" style="display: none;">
+                <h3>NES Data Export</h3>
+                <div class="export-files">
+                    <a id="chrLink" class="export-link" target="_blank">pattern_table.chr</a>
+                    <a id="nametableLink" class="export-link" target="_blank">name_table.nam</a>
+                </div>
+                <div class="preview-canvases">
+                    <div class="preview-section">
+                        <h4>Pattern Table Preview</h4>
+                        <canvas id="chrPreview" width="128" height="128"></canvas>
+                    </div>
+                    <div class="preview-section">
+                        <h4>Reconstructed Image</h4>
+                        <canvas id="reconstructedPreview" width="256" height="240"></canvas>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
     <footer>

@@ -37,10 +37,13 @@ const process = (file, data) => {
 	// ask user for filetype
 }
 
+
 window.addEventListener("DOMContentLoaded", () => {
-	output = document.getElementById("output");
+
 	logbox = document.getElementById("logbox");
+
 	// velocity calculator
+	arc_out = document.getElementById("arctang_output");
 	let velcalc = document.getElementById("arctang_vel_calc")
 	velcalc.addEventListener('input', () => {
 		let table = '';
@@ -58,7 +61,28 @@ window.addEventListener("DOMContentLoaded", () => {
 			let byte_lo = Math.floor((distance - byte_hi) * 256).toString().padStart(3, ' ');
 			table += "\n\tbyte    " + byte_lo + ", " + byte_hi + "    ; " + distance;
 		}
-		output.innerText = 'arctang velocity calculator output:' + table;
+		arc_out.innerText = 'arctang velocity calculator output:' + table;
 	});
+
+	// velocity calculator
+	let dist_in = document.getElementById("distance_calc")
+	let ang_in = document.getElementById("angle_calc")
+	let distangcalc = () => {
+		distance = Math.abs(Number(dist_in.value));
+		angle = Math.abs(Number(ang_in.value) * (Math.PI / 180));
+		console.log(distance);
+		console.log(angle);
+		let x = distance * Math.cos(angle);
+		let y = distance * Math.sin(angle);
+		dist_out = document.getElementById("distance_output");
+		dist_out.innerText = "x: " + x + " , y: " + y;
+		dist_out.innerText += "\n";
+		dist_out.innerText += Math.floor(x) + ":" + tohex(Math.floor((x % 1) * 256)) + " ";
+		dist_out.innerText += Math.floor(y) + ":" + tohex(Math.floor((y % 1) * 256));
+	}
+	dist_in.addEventListener('input', distangcalc);
+	ang_in.addEventListener('input', distangcalc);
+
+
 	console.log('core intiialized');
 });
