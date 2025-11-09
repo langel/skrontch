@@ -75,10 +75,10 @@ window.addEventListener("DOMContentLoaded", () => {
 		let x = distance * Math.cos(angle);
 		let y = distance * Math.sin(angle);
 		dist_out = document.getElementById("distance_output");
-		dist_out.innerText = "x: " + x + " , y: " + y;
+		dist_out.innerText = "x: " + x.toFixed(5) + " , y: " + y.toFixed(5);
 		dist_out.innerText += "\n";
-		dist_out.innerText += Math.floor(x) + ":" + tohex(Math.floor((x % 1) * 256)) + " ";
-		dist_out.innerText += Math.floor(y) + ":" + tohex(Math.floor((y % 1) * 256));
+		dist_out.innerText += ((x >= 0) ? Math.floor(x) : Math.ceil(x)) + ":" + tohex(Math.abs(Math.floor((x % 1) * 256))) + " ";
+		dist_out.innerText += ((y >= 0) ? Math.floor(y) : Math.ceil(y)) + ":" + tohex(Math.abs(Math.floor((y % 1) * 256)));
 	}
 	dist_in.addEventListener('input', distangcalc);
 	ang_in.addEventListener('input', distangcalc);
