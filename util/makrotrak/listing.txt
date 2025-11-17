@@ -1,0 +1,1681 @@
+------- FILE makrotrak.asm LEVEL 1 PASS 2
+      1  12000 ????
+      2  12000 ????				       processor	6502
+      3  12000 ????
+------- FILE definitions.asm LEVEL 2 PASS 2
+      0  12000 ????				       include	"definitions.asm"
+      1  12000 ????
+      2  12000 ????
+      3  12000 ????						;;;;; CONSTANTS
+      4  12000 ????
+      5  12000 ????			    PPU_CTRL   EQM	$2000
+      6  12000 ????			    PPU_MASK   EQM	$2001
+      7  12000 ????			    PPU_STATUS EQM	$2002
+      8  12000 ????			    OAM_ADDR   EQM	$2003
+      9  12000 ????			    OAM_DATA   EQM	$2004
+     10  12000 ????			    PPU_SCROLL EQM	$2005
+     11  12000 ????			    PPU_ADDR   EQM	$2006
+     12  12000 ????			    PPU_DATA   EQM	$2007
+     13  12000 ????
+     14  12000 ????			    PPU_OAM_DMA EQM	$4014
+     15  12000 ????			    DMC_FREQ   EQM	$4010
+     16  12000 ????			    APU_STATUS EQM	$4015
+     17  12000 ????			    APU_NOISE_VOL EQM	$400C
+     18  12000 ????			    APU_NOISE_FREQ EQM	$400E
+     19  12000 ????			    APU_NOISE_TIMER EQM	$400F
+     20  12000 ????			    APU_DMC_CTRL EQM	$4010
+     21  12000 ????			    APU_CHAN_CTRL EQM	$4015
+     22  12000 ????			    APU_FRAME  EQM	$4017
+     23  12000 ????
+     24  12000 ????			    JOYPAD1    EQM	$4016
+     25  12000 ????			    JOYPAD2    EQM	$4017
+     26  12000 ????
+     27  12000 ????			    JOYPAD1    EQM	$4016
+     28  12000 ????			    JOYPAD2    EQM	$4017
+     29  12000 ????			    BUTTON_A   EQM	1 << 7
+     30  12000 ????			    BUTTON_B   EQM	1 << 6
+     31  12000 ????			    BUTTON_SELECT EQM	1 << 5
+     32  12000 ????			    BUTTON_START EQM	1 << 4
+     33  12000 ????			    BUTTON_UP  EQM	1 << 3
+     34  12000 ????			    BUTTON_DOWN EQM	1 << 2
+     35  12000 ????			    BUTTON_LEFT EQM	1 << 1
+     36  12000 ????			    BUTTON_RIGHT EQM	1 << 0
+     37  12000 ????
+     38  12000 ????						; NOTE: I've put this outside of the PPU & APU, because it is a feature
+     39  12000 ????						; of the APU that is primarily of use to the PPU.
+     40  12000 ????			    OAM_DMA    EQM	$4014
+     41  12000 ????						; OAM local RAM copy goes from $0200-$02FF:
+     42  12000 ????			    OAM_RAM    EQM	$0200
+     43  12000 ????
+     44  12000 ????						; PPU_CTRL flags
+     45  12000 ????			    CTRL_NMI   EQM	%10000000	; Execute Non-Maskable Interrupt on VBlank
+     46  12000 ????			    CTRL_8x8   EQM	%00000000	; Use 8x8 Sprites
+     47  12000 ????			    CTRL_8x16  EQM	%00100000	; Use 8x16 Sprites
+     48  12000 ????			    CTRL_BG_0000 EQM	%00000000	; Background Pattern Table at $0000 in VRAM
+     49  12000 ????			    CTRL_BG_1000 EQM	%00010000	; Background Pattern Table at $1000 in VRAM
+     50  12000 ????			    CTRL_SPR_0000 EQM	%00000000	; Sprite Pattern Table at $0000 in VRAM
+     51  12000 ????			    CTRL_SPR_1000 EQM	%00001000	; Sprite Pattern Table at $1000 in VRAM
+     52  12000 ????			    CTRL_INC_1 EQM	%00000000	; Increment PPU Address by 1 (Horizontal rendering)
+     53  12000 ????			    CTRL_INC_32 EQM	%00000100	; Increment PPU Address by 32 (Vertical rendering)
+     54  12000 ????			    CTRL_NT_2000 EQM	%00000000	; Name Table Address at $2000
+     55  12000 ????			    CTRL_NT_2400 EQM	%00000001	; Name Table Address at $2400
+     56  12000 ????			    CTRL_NT_2800 EQM	%00000010	; Name Table Address at $2800
+     57  12000 ????			    CTRL_NT_2C00 EQM	%00000011	; Name Table Address at $2C00
+     58  12000 ????
+     59  12000 ????						; PPU_MASK flags
+     60  12000 ????			    MASK_TINT_RED EQM	%00100000	; Red Background
+     61  12000 ????			    MASK_TINT_BLUE EQM	%01000000	; Blue Background
+     62  12000 ????			    MASK_TINT_GREEN EQM	%10000000	; Green Background
+     63  12000 ????			    MASK_SPR   EQM	%00010000	; Sprites Visible
+     64  12000 ????			    MASK_BG    EQM	%00001000	; Backgrounds Visible
+     65  12000 ????			    MASK_SPR_CLIP EQM	%00000100	; Sprites clipped on left column
+     66  12000 ????			    MASK_BG_CLIP EQM	%00000010	; Background clipped on left column
+     67  12000 ????			    MASK_COLOR EQM	%00000000	; Display in Color
+     68  12000 ????			    MASK_MONO  EQM	%00000001	; Display in Monochrome
+     69  12000 ????
+     70  12000 ????						; read flags
+     71  12000 ????			    F_BLANK    EQM	%10000000	; VBlank Active
+     72  12000 ????			    F_SPRITE0  EQM	%01000000	; VBlank hit Sprite 0
+     73  12000 ????			    F_SCAN8    EQM	%00100000	; More than 8 sprites on current scanline
+     74  12000 ????			    F_WIGNORE  EQM	%00010000	; VRAM Writes currently ignored.
+     75  12000 ????
+     76  12000 ????
+     77  12000 ????						;;;;; CARTRIDGE FILE HEADER
+     78  12000 ????
+     79  12000 ????			    NES_MIRR_HORIZ EQM	0
+     80  12000 ????			    NES_MIRR_VERT EQM	1
+     81  12000 ????			    NES_MIRR_QUAD EQM	8
+     82  12000 ????
+     83  12000 ????
+     84  12000 ????				       MAC	nes_header
+     85  12000 ????				       seg	Header
+     86  12000 ????				       org	$7ff0
+     87  12000 ????			    .NES_MAPPER SET	{1}	;mapper number
+     88  12000 ????			    .NES_PRG_BANKS SET	{2}	;number of 16K PRG banks, change to 2 for NROM256
+     89  12000 ????			    .NES_CHR_BANKS SET	{3}	;number of 8K CHR banks (0 = RAM)
+     90  12000 ????			    .NES_MIRRORING SET	{4}	;0 horizontal, 1 vertical, 8 four screen
+     91  12000 ????			    .NES_RAM_EXP SET	{5}	;0 false, 1 8K extra ram
+     92  12000 ????				       byte	$4e,$45,$53,$1a	; header
+     93  12000 ????				       byte	.NES_PRG_BANKS
+     94  12000 ????				       byte	.NES_CHR_BANKS
+     95  12000 ????				       byte	.NES_MIRRORING|(.NES_MAPPER<<4)|.NES_RAM_EXP
+     96  12000 ????				       byte	.NES_MAPPER&$f0
+     97  12000 ????				       byte	0,0,0,0,0,0,0,0	; reserved, set to zero
+     98  12000 ????				       seg	Code
+     99  12000 ????				       org	$8000
+    100  12000 ????				       ENDM
+    101  12000 ????
+    102  12000 ????
+    103  12000 ????				       MAC	nes_init
+    104  12000 ????				       sei		;disable IRQs
+    105  12000 ????				       cld		;decimal mode not supported
+    106  12000 ????				       ldx	#$ff
+    107  12000 ????				       txs		;set up stack pointer
+    108  12000 ????				       inx		;increment X to 0
+    109  12000 ????				       stx	PPU_MASK	;disable rendering
+    110  12000 ????				       stx	DMC_FREQ	;disable DMC interrupts
+    111  12000 ????				       stx	PPU_CTRL	;disable NMI interrupts
+    112  12000 ????				       bit	PPU_STATUS	;clear VBL flag
+    113  12000 ????				       bit	APU_CHAN_CTRL	;ack DMC IRQ bit 7
+    114  12000 ????				       lda	#$40
+    115  12000 ????				       sta	APU_FRAME	;disable APU Frame IRQ
+    116  12000 ????				       lda	#$0F
+    117  12000 ????				       sta	APU_CHAN_CTRL	;disable DMC, enable/init other channels.	  
+    118  12000 ????				       ENDM
+    119  12000 ????
+    120  12000 ????
+    121  12000 ????				       MAC	blit
+    122  12000 ????			    .COUNT     SET	{1}
+    123  12000 ????				       REPEAT	.COUNT
+    124  12000 ????				       bit	$2002
+    125  12000 ????				       REPEND
+    126  12000 ????				       ENDM
+    127  12000 ????
+    128  12000 ????
+    129  12000 ????				       MAC	inc_x
+    130  12000 ????			    .COUNT     SET	{1}
+    131  12000 ????				       REPEAT	.COUNT
+    132  12000 ????				       inx
+    133  12000 ????				       REPEND
+    134  12000 ????				       ENDM
+    135  12000 ????
+    136  12000 ????
+    137  12000 ????				       MAC	inc_y
+    138  12000 ????			    .COUNT     SET	{1}
+    139  12000 ????				       REPEAT	.COUNT
+    140  12000 ????				       iny
+    141  12000 ????				       REPEND
+    142  12000 ????				       ENDM
+    143  12000 ????
+    144  12000 ????
+    145  12000 ????				       MAC	nops
+    146  12000 ????			    .COUNT     SET	{1}
+    147  12000 ????				       REPEAT	.COUNT
+    148  12000 ????				       nop
+    149  12000 ????				       REPEND
+    150  12000 ????				       ENDM
+    151  12000 ????
+    152  12000 ????
+    153  12000 ????				       MAC	ppu_addr_set
+    154  12000 ????						; set 16bit address pointer in PPU
+    155  12000 ????				       lda	#>{1}	; upper byte
+    156  12000 ????				       sta	PPU_ADDR
+    157  12000 ????				       lda	#<{1}	; lower byte
+    158  12000 ????				       sta	PPU_ADDR
+    159  12000 ????				       ENDM
+    160  12000 ????
+    161  12000 ????
+    162  12000 ????				       MAC	ppu_decimal_00
+    163  12000 ????				       asl
+    164  12000 ????				       tax
+    165  12000 ????				       lda	decimal_99_text_offset_80,x
+    166  12000 ????				       sta	PPU_DATA
+    167  12000 ????				       inx
+    168  12000 ????				       lda	decimal_99_text_offset_80,x
+    169  12000 ????				       sta	PPU_DATA
+    170  12000 ????				       ENDM
+    171  12000 ????
+    172  12000 ????
+    173  12000 ????				       MAC	ppu_decimal_x0
+    174  12000 ????				       asl
+    175  12000 ????				       tax
+    176  12000 ????				       lda	decimal_x9_text_offset_80,x
+    177  12000 ????				       sta	PPU_DATA
+    178  12000 ????				       inx
+    179  12000 ????				       lda	decimal_x9_text_offset_80,x
+    180  12000 ????				       sta	PPU_DATA
+    181  12000 ????				       ENDM
+    182  12000 ????
+    183  12000 ????
+    184  12000 ????				       MAC	ppu_fill
+    185  12000 ????						; unwound loop
+    186  12000 ????						; sends {1} to PPU data {2} times
+    187  12000 ????				       REPEAT	{2}
+    188  12000 ????				       lda	#{1}
+    189  12000 ????				       sta	PPU_DATA
+    190  12000 ????				       REPEND
+    191  12000 ????				       ENDM
+    192  12000 ????
+    193  12000 ????
+    194  12000 ????				       MAC	ppu_loop
+    195  12000 ????						; load {1} into PPU {2} times
+    196  12000 ????				       lda	#{1}
+    197  12000 ????				       ldx	#{2}
+    198  12000 ????			    .loop
+    199  12000 ????				       sta	PPU_DATA
+    200  12000 ????				       dex
+    201  12000 ????				       bne	.loop
+    202  12000 ????				       ENDM
+    203  12000 ????
+    204  12000 ????
+    205  12000 ????				       MAC	ppu_popslide
+    206  12000 ????						; popslide {1} times
+    207  12000 ????			    .COUNT     SET	{1}
+    208  12000 ????				       REPEAT	.COUNT
+    209  12000 ????				       pla
+    210  12000 ????				       sta	PPU_DATA
+    211  12000 ????				       REPEND
+    212  12000 ????				       ENDM
+    213  12000 ????
+    214  12000 ????
+    215  12000 ????				       MAC	ppu_plot
+    216  12000 ????						; unwound loop
+    217  12000 ????						; reads {2} bytes to PPU starting at {1}
+    218  12000 ????			    .COUNT     SET	0
+    219  12000 ????				       REPEAT	{2}
+    220  12000 ????				       lda	#{1}+.COUNT
+    221  12000 ????				       sta	PPU_DATA
+    222  12000 ????			    .COUNT     SET	.COUNT+1
+    223  12000 ????				       REPEND
+    224  12000 ????				       ENDM
+    225  12000 ????
+    226  12000 ????
+    227  12000 ????				       MAC	ppu_plot_text
+    228  12000 ????						; write string at {2} to PPU at {1}
+    229  12000 ????						; 00 terminated
+    230  12000 ????				       PPU_SETADDR	{1}
+    231  12000 ????				       ldx	#$00
+    232  12000 ????			    .text_loop
+    233  12000 ????				       lda	{2},x
+    234  12000 ????				       beq	.text_done
+    235  12000 ????				       sta	PPU_DATA
+    236  12000 ????				       inx
+    237  12000 ????				       jmp	.text_loop
+    238  12000 ????			    .text_done
+    239  12000 ????				       ENDM
+    240  12000 ????
+    241  12000 ????
+    242  12000 ????				       MAC	ppu_setvalue
+    243  12000 ????						; feed {1} to PPU
+    244  12000 ????				       lda	#{1}
+    245  12000 ????				       sta	PPU_DATA
+    246  12000 ????				       ENDM
+    247  12000 ????
+    248  12000 ????
+    249  12000 ????				       MAC	shift_l
+    250  12000 ????			    .COUNT     SET	{1}
+    251  12000 ????				       REPEAT	.COUNT
+    252  12000 ????				       asl
+    253  12000 ????				       REPEND
+    254  12000 ????				       ENDM
+    255  12000 ????
+    256  12000 ????
+    257  12000 ????				       MAC	shift_r
+    258  12000 ????			    .COUNT     SET	{1}
+    259  12000 ????				       REPEAT	.COUNT
+    260  12000 ????				       lsr
+    261  12000 ????				       REPEND
+    262  12000 ????				       ENDM
+    263  12000 ????
+    264  12000 ????
+    265  12000 ????				       MAC	state_registers_reset
+    266  12000 ????				       lda	#$00
+    267  12000 ????				       sta	state00
+    268  12000 ????				       sta	state01
+    269  12000 ????				       sta	state02
+    270  12000 ????				       sta	state03
+    271  12000 ????				       sta	state04
+    272  12000 ????				       sta	state05
+    273  12000 ????				       sta	state06
+    274  12000 ????				       sta	state07
+    275  12000 ????				       sta	scroll_x
+    276  12000 ????				       sta	scroll_y
+    277  12000 ????				       ENDM
+    278  12000 ????
+    279  12000 ????
+    280  12000 ????				       MAC	save_regs
+    281  12000 ????				       pha
+    282  12000 ????				       txa
+    283  12000 ????				       pha
+    284  12000 ????				       tya
+    285  12000 ????				       pha
+    286  12000 ????				       ENDM
+    287  12000 ????
+    288  12000 ????
+    289  12000 ????				       MAC	restore_regs
+    290  12000 ????				       pla
+    291  12000 ????				       tay
+    292  12000 ????				       pla
+    293  12000 ????				       tax
+    294  12000 ????				       pla
+    295  12000 ????				       ENDM
+    296  12000 ????
+    297  12000 ????
+    298  12000 ????						;-------------------------------------------------------------------------------
+    299  12000 ????						; SLEEP clockcycles
+    300  12000 ????						; Original author: Thomas Jentzsch
+    301  12000 ????						; Inserts code which takes the specified number of cycles to execute.	This is
+    302  12000 ????						; useful for code where precise timing is required.
+    303  12000 ????						; LEGAL OPCODE VERSION MAY AFFECT FLAGS (uses 'bit' opcode)
+    304  12000 ????
+    305  12000 ????			    NO_ILLEGAL_OPCODES EQM	1
+    306  12000 ????
+    307  12000 ????				       MAC	sleep
+    308  12000 ????			    .CYCLES    SET	{1}
+    309  12000 ????				       IF	.CYCLES < 2
+    310  12000 ????				       ECHO	"MACRO ERROR: 'SLEEP': Duration must be > 1"
+    311  12000 ????				       ERR
+    312  12000 ????				       ENDIF
+    313  12000 ????				       IF	.CYCLES & 1
+    314  12000 ????				       IFNCONST	NO_ILLEGAL_OPCODES
+    315  12000 ????				       nop	0
+    316  12000 ????				       ELSE
+    317  12000 ????				       bit	$00
+    318  12000 ????				       ENDIF
+    319  12000 ????				       .CYCLES	SET .CYCLES - 3
+    320  12000 ????				       ENDIF
+    321  12000 ????				       REPEAT	.CYCLES / 2
+    322  12000 ????				       nop
+    323  12000 ????				       REPEND
+    324  12000 ????				       ENDM		;usage: SLEEP n (n>1)
+------- FILE makrotrak.asm
+------- FILE zero_page.asm LEVEL 2 PASS 2
+      0  12000 ????				       include	"zero_page.asm"
+      1  12000 ????						;;;;; VARIABLES
+      2  12000 ????
+      3 U06e1 ????				      seg.u	ZEROPAGE
+      4 U0000					      org	$0
+      5 U0000
+      6 U0000		       00	   wtf	      byte.b
+      7 U0001		       00	   nmi_lockout byte.b		; *
+      8 U0002		       00	   temp00     byte.b
+      9 U0003		       00	   temp01     byte.b
+     10 U0004		       00	   temp02     byte.b
+     11 U0005		       00	   temp03     byte.b
+     12 U0006		       00	   temp04     byte.b
+     13 U0007		       00	   temp05     byte.b
+     14 U0008		       00	   temp06     byte.b
+     15 U0009		       00	   temp07     byte.b
+     16 U000a		       00	   state00    byte.b
+     17 U000b		       00	   state01    byte.b
+     18 U000c		       00	   state02    byte.b
+     19 U000d		       00	   state03    byte.b
+     20 U000e		       00	   state04    byte.b
+     21 U000f		       00	   state05    byte.b
+     22 U0010		       00	   state06    byte.b
+     23 U0011		       00	   state07    byte.b
+     24 U0012		       00	   rng0       byte.b
+     25 U0013		       00	   oam_disable byte.b		; *
+     26 U0014		       00	   controls   byte.b
+     27 U0015		       00	   controls_d byte.b
+     28 U0016		       00	   ppu_mask_emph byte.b		; *
+     29 U0017
+     30 U0017		       00	   state_jmp_lo byte.b
+     31 U0018		       00	   state_jmp_hi byte.b
+     32 U0019
+     33 U0019		       00	   timer_lo   byte.b
+     34 U001a		       00	   timer_hi   byte.b
+     35 U001b
+     36 U001b
+     37 U001b		       00	   scroll_x   byte.b
+     38 U001c		       00	   scroll_y   byte.b
+     39 U001d		       00	   scroll_nm  byte.b		; nametable
+     40 U001e
+     41 U001e		       00	   ent_slot   byte.b
+     42 U001f		       00	   ent_slot_start byte.b
+     43 U0020		       00	   ent_spr_ptr byte.b
+     44 U0021
+     45 U0021		       00	   collision_0_x byte.b
+     46 U0022		       00	   collision_0_y byte.b
+     47 U0023		       00	   collision_0_w byte.b
+     48 U0024		       00	   collision_0_h byte.b
+     49 U0025		       00	   collision_1_x byte.b
+     50 U0026		       00	   collision_1_y byte.b
+     51 U0027		       00	   collision_1_w byte.b
+     52 U0028		       00	   collision_1_h byte.b
+     53 U0029		       00	   collis_char_x byte.b
+     54 U002a		       00	   collis_char_y byte.b
+     55 U002b
+     56 U002b		       00	   arctang_velocity_lo byte.b		; *
+     57 U002c		       00	   arctang_velocity_hi byte.b		; *
+     58 U002d
+     59 U002d		       00	   rng_seed0  byte.b
+     60 U002e		       00	   rng_seed1  byte.b
+     61 U002f		       00	   rng_val0   byte.b
+     62 U0030		       00	   rng_val1   byte.b
+     63 U0031
+     64 U0031
+     65 U0031				   spr_a      EQM	$0202
+     66 U0031				   spr_p      EQM	$0201
+     67 U0031				   spr_x      EQM	$0203
+     68 U0031				   spr_y      EQM	$0200
+     69 U0031
+     70 U0031
+     71 U0400					      org	$0400
+     72 U0400		       00	   ent_type   byte.b
+     73 U0420					      org	$0420
+     74 U0420		       00	   ent_spawn  byte.b
+     75 U0440					      org	$0440
+     76 U0440		       00	   ent_x_hi   byte.b
+     77 U0460					      org	$0460
+     78 U0460		       00	   ent_x      byte.b
+     79 U0480					      org	$0480
+     80 U0480		       00	   ent_x_lo   byte.b
+     81 U04a0					      org	$04a0
+     82 U04a0		       00	   ent_y      byte.b
+     83 U04c0					      org	$04c0
+     84 U04c0		       00	   ent_y_lo   byte.b
+     85 U04e0					      org	$04e0
+     86 U04e0		       00	   ent_h      byte.b
+     87 U0500					      org	$0500
+     88 U0500		       00	   ent_h_lo   byte.b
+     89 U0520					      org	$0520
+     90 U0520		       00	   ent_v      byte.b
+     91 U0540					      org	$0540
+     92 U0540		       00	   ent_v_lo   byte.b
+     93 U0560					      org	$0560
+     94 U0560		       00	   ent_dir    byte.b
+     95 U0580					      org	$0580
+     96 U0580		       00	   ent_hp     byte.b
+     97 U05a0					      org	$05a0
+     98 U05a0		       00	   ent_dmg    byte.b
+     99 U05c0					      org	$05c0
+    100 U05c0		       00	   ent_hit    byte.b
+    101 U05e0					      org	$05e0
+    102 U05e0		       00	   ent_r0     byte.b
+    103 U0600					      org	$0600
+    104 U0600		       00	   ent_r1     byte.b
+    105 U0620					      org	$0620
+    106 U0620		       00	   ent_r2     byte.b
+    107 U0640					      org	$0640
+    108 U0640		       00	   ent_r3     byte.b
+    109 U0660					      org	$0660
+    110 U0660		       00	   ent_r4     byte.b
+    111 U0680					      org	$0680
+    112 U0680		       00	   ent_r5     byte.b
+    113 U06a0					      org	$06a0
+    114 U06a0		       00	   ent_r6     byte.b
+    115 U06c0					      org	$06c0
+    116 U06c0		       00	   ent_r7     byte.b
+    117 U06e0					      org	$06e0
+    118 U06e0		       00	   ent_r8     byte.b
+------- FILE makrotrak.asm
+      6 U06e1
+      7 U06e1							; HEADER
+      8 U06e1							; mapper, PRGs (16k), CHRs (8k), mirror, ram expansion
+      0 U06e1					      NES_HEADER	0, 2, 1, NES_MIRR_HORIZ, 0
+      1  8000 ????				      seg	Header
+      2  7ff0					      org	$7ff0
+      3  7ff0				   .NES_MAPPER SET	0
+      4  7ff0				   .NES_PRG_BANKS SET	2
+      5  7ff0				   .NES_CHR_BANKS SET	1
+      6  7ff0				   .NES_MIRRORING SET	NES_MIRR_HORIZ
+      7  7ff0				   .NES_RAM_EXP SET	0
+      8  7ff0		       4e 45 53 1a	      byte.b	$4e,$45,$53,$1a
+      9  7ff4		       02		      byte.b	.NES_PRG_BANKS
+     10  7ff5		       01		      byte.b	.NES_CHR_BANKS
+     11  7ff6		       00		      byte.b	.NES_MIRRORING|(.NES_MAPPER<<4)|.NES_RAM_EXP
+     12  7ff7		       00		      byte.b	.NES_MAPPER&$f0
+     13  7ff8		       00 00 00 00*	      byte.b	0,0,0,0,0,0,0,0
+     14  8000 ????				      seg	Code
+     15  8000					      org	$8000
+     10  8000
+     11  e000 ????				      seg	DATA_BANKS
+     12  8000					      org	$08000
+     13  8000					      rorg	$8000
+     14  8000				   main_layout_nam
+------- FILE vectors.asm LEVEL 2 PASS 2
+      0  8000					      include	"vectors.asm"
+      1  8000
+      2  8000				   cart_start subroutine
+      0  8000					      NES_INIT		; set up stack pointer, turn off PPU
+      1  8000		       78		      sei
+      2  8001		       d8		      cld
+      3  8002		       a2 ff		      ldx	#$ff
+      4  8004		       9a		      txs
+      5  8005		       e8		      inx
+      6  8006		       8e 01 20 	      stx	PPU_MASK
+      7  8009		       8e 10 40 	      stx	DMC_FREQ
+      8  800c		       8e 00 20 	      stx	PPU_CTRL
+      9  800f		       2c 02 20 	      bit	PPU_STATUS
+     10  8012		       2c 15 40 	      bit	APU_CHAN_CTRL
+     11  8015		       a9 40		      lda	#$40
+     12  8017		       8d 17 40 	      sta	APU_FRAME
+     13  801a		       a9 0f		      lda	#$0F
+     14  801c		       8d 15 40 	      sta	APU_CHAN_CTRL
+      4  801f		       20 37 82 	      jsr	vsync_wait
+      5  8022		       20 37 82 	      jsr	vsync_wait
+      6  8025
+      7  8025							; clear ram
+      8  8025		       a9 00		      lda	#0
+      9  8027		       aa		      tax
+     10  8028				   .ram_clear_loop
+     11  8028		       95 00		      sta	$0,x
+     12  802a		       e0 fe		      cpx	#$fe
+     13  802c		       b0 03		      bcs	.skip_stack
+     14  802e		       9d 00 01 	      sta	$100,x
+     15  8031				   .skip_stack
+     16  8031		       a9 ef		      lda	#$ef
+     17  8033		       9d 00 02 	      sta	$200,x
+     18  8036		       a9 00		      lda	#$00
+     19  8038		       9d 00 03 	      sta	$300,x
+     20  803b		       9d 00 04 	      sta	$400,x
+     21  803e		       9d 00 05 	      sta	$500,x
+     22  8041		       9d 00 06 	      sta	$600,x
+     23  8044		       9d 00 07 	      sta	$700,x
+     24  8047		       e8		      inx
+     25  8048		       d0 de		      bne	.ram_clear_loop
+     26  804a
+     27  804a		       20 2e 82 	      jsr	render_disable
+     28  804d		       a9 01		      lda	#$01
+     29  804f		       85 12		      sta	rng0
+     30  8051		       20 f5 81 	      jsr	rng_seed
+     31  8054
+     32  8054		       58		      cli
+     33  8055
+     34  8055		       20 8d 87 	      jsr	state_title_init
+     35  8058							;jsr state_explore_init
+     36  8058
+     37  8058
+     38  8058				   .endless
+     39  8058		       4c 58 80 	      jmp	.endless	; endless loop
+     40  805b
+     41  805b
+     42  805b
+     43  805b
+     44  805b
+     45  805b
+     46  805b
+     47  805b				   nmi_handler subroutine
+     48  805b
+     49  805b							; ~2250 cycles for PPU access (PAL is 7450 cycles)
+     50  805b							; "On NTSC, count on being able to copy 160 bytes 
+     51  805b							; to nametables or the palette using a moderately 
+     52  805b							; unrolled loop"
+     53  805b							; write 64 tiles?
+     54  805b							; write all palettes
+     55  805b							; oam dma
+     56  805b
+      0  805b					      SAVE_REGS		; 13 cycles
+      1  805b		       48		      pha
+      2  805c		       8a		      txa
+      3  805d		       48		      pha
+      4  805e		       98		      tya
+      5  805f		       48		      pha
+     58  8060
+     59  8060							; enable NMI lockout
+     60  8060		       a5 01		      lda	nmi_lockout
+     61  8062		       c9 00		      cmp	#$00
+     62  8064		       f0 03		      beq	.no_lock
+     63  8066		       4c a4 80 	      jmp	.nmi_end
+     64  8069				   .no_lock
+     65  8069		       e6 01		      inc	nmi_lockout
+     66  806b
+     67  806b							; PPU vBLANK STUFF
+     68  806b
+     69  806b							; OAM DMA	513 cycles
+     70  806b		       a5 13		      lda	oam_disable
+     71  806d		       d0 05		      bne	.oam_skip
+     72  806f		       a9 02		      lda	#$02
+     73  8071		       8d 14 40 	      sta	PPU_OAM_DMA
+     74  8074				   .oam_skip
+     75  8074
+     76  8074							;/*
+     77  8074							;	; PALETTE RENDER 
+     78  8074							;	; old method: 12 + 32 x 7 = 236 cycles
+     79  8074							;	; current method: 90 (+ 64 for sprites) = 154 cycles
+     80  8074							;	PPU_ADDR_SET $3f00	; 12 cycles
+     81  8074							;	tsx			; 14
+     82  8074							;	stx temp02		; 17
+     83  8074							;	ldx #$ff		; 19
+     84  8074							;	txs			; 21
+     85  8074							;	PPU_POPSLIDE 32  ; 8 cycles each
+     86  8074							;
+     87  8074							;	ldx temp02		; 88
+     88  8074							;	txs			; 90
+     89  8074							;*/
+     90  8074
+     91  8074							; SCROLL POS	17 cycles
+     92  8074		       2c 02 20 	      bit	PPU_STATUS
+     93  8077		       a5 1b		      lda	scroll_x
+     94  8079		       8d 05 20 	      sta	PPU_SCROLL
+     95  807c		       a5 1c		      lda	scroll_y
+     96  807e		       8d 05 20 	      sta	PPU_SCROLL
+     97  8081
+     98  8081							; NAMETABLE++	
+     99  8081		       a5 1d		      lda	scroll_nm
+    100  8083		       29 03		      and	#$03
+    101  8085		       09 88		      ora	#CTRL_NMI|CTRL_SPR_1000
+    102  8087		       8d 00 20 	      sta	PPU_CTRL
+    103  808a		       a5 16		      lda	ppu_mask_emph
+    104  808c							;lda #$80
+    105  808c		       09 1e		      ora	#MASK_BG|MASK_SPR|MASK_SPR_CLIP|MASK_BG_CLIP
+    106  808e		       8d 01 20 	      sta	PPU_MASK
+    107  8091
+    108  8091							; hope everything above was under
+    109  8091							; ~2250 cycles!
+    110  8091
+    111  8091		       20 b5 82 	      jsr	controller_read
+    112  8094
+    113  8094		       e6 00		      inc	wtf
+    114  8096
+    115  8096		       20 cd 86 	      jsr	state_jmp_to
+    116  8099
+    117  8099							; disable NMI lockout
+    118  8099		       a9 00		      lda	#$00
+    119  809b		       85 01		      sta	nmi_lockout
+    120  809d
+    121  809d
+    122  809d		       a5 16		      lda	ppu_mask_emph
+    123  809f		       09 1e		      ora	#MASK_BG|MASK_SPR|MASK_SPR_CLIP|MASK_BG_CLIP
+    124  80a1		       8d 01 20 	      sta	PPU_MASK
+    125  80a4
+    126  80a4				   .nmi_end
+      0  80a4					      RESTORE_REGS		; 16 cycles
+      1  80a4		       68		      pla
+      2  80a5		       a8		      tay
+      3  80a6		       68		      pla
+      4  80a7		       aa		      tax
+      5  80a8		       68		      pla
+    128  80a9		       40		      rti
+    129  80aa
+------- FILE makrotrak.asm
+------- FILE common.asm LEVEL 2 PASS 2
+      0  80aa					      include	"common.asm"
+      1  80aa
+      2  80aa
+      3  80aa							;;;;; SUBROUTINES
+      4  80aa
+      5  80aa				   do_nothing subroutine
+      6  80aa		       60		      rts
+      7  80ab
+      8  80ab
+      9  80ab				   nametable_fill subroutine
+     10  80ab							; a = nametable high address
+     11  80ab							; temp00 = fill tile
+     12  80ab							; temp01 = fill attribute
+     13  80ab							; requires render_disable status
+     14  80ab		       8d 06 20 	      sta	PPU_ADDR
+     15  80ae		       a9 00		      lda	#$00
+     16  80b0		       8d 06 20 	      sta	PPU_ADDR
+     17  80b3		       8d 00 20 	      sta	PPU_CTRL
+     18  80b6		       aa		      tax
+     19  80b7		       a5 02		      lda	temp00
+     20  80b9				   .loop0
+     21  80b9		       8d 07 20 	      sta	PPU_DATA
+     22  80bc		       e8		      inx
+     23  80bd		       d0 fa		      bne	.loop0
+     24  80bf				   .loop1
+     25  80bf		       8d 07 20 	      sta	PPU_DATA
+     26  80c2		       e8		      inx
+     27  80c3		       d0 fa		      bne	.loop1
+     28  80c5				   .loop2
+     29  80c5		       8d 07 20 	      sta	PPU_DATA
+     30  80c8		       e8		      inx
+     31  80c9		       d0 fa		      bne	.loop2
+     32  80cb				   .loop3
+     33  80cb		       8d 07 20 	      sta	PPU_DATA
+     34  80ce		       e8		      inx
+     35  80cf		       e0 c0		      cpx	#$c0
+     36  80d1		       d0 f8		      bne	.loop3
+     37  80d3							; attributes here
+     38  80d3		       a5 03		      lda	temp01
+     39  80d5				   .attr_loop
+     40  80d5		       8d 07 20 	      sta	PPU_DATA
+     41  80d8		       e8		      inx
+     42  80d9		       d0 fa		      bne	.attr_loop
+     43  80db		       60		      rts
+     44  80dc
+     45  80dc
+     46  80dc				   nametable_load subroutine
+     47  80dc							; a = nametable high address
+     48  80dc							; temp00 = .nam lo address
+     49  80dc							; temp01 = .nam hi address
+     50  80dc		       8d 06 20 	      sta	PPU_ADDR
+     51  80df		       a9 00		      lda	#$00
+     52  80e1		       8d 06 20 	      sta	PPU_ADDR
+     53  80e4		       8d 00 20 	      sta	PPU_CTRL
+     54  80e7		       a8		      tay
+     55  80e8				   .loop0
+     56  80e8		       b1 02		      lda	(temp00),y
+     57  80ea		       8d 07 20 	      sta	PPU_DATA
+     58  80ed		       c8		      iny
+     59  80ee		       d0 f8		      bne	.loop0
+     60  80f0		       e6 03		      inc	temp01
+     61  80f2				   .loop1
+     62  80f2		       b1 02		      lda	(temp00),y
+     63  80f4		       8d 07 20 	      sta	PPU_DATA
+     64  80f7		       c8		      iny
+     65  80f8		       d0 f8		      bne	.loop1
+     66  80fa		       e6 03		      inc	temp01
+     67  80fc				   .loop2
+     68  80fc		       b1 02		      lda	(temp00),y
+     69  80fe		       8d 07 20 	      sta	PPU_DATA
+     70  8101		       c8		      iny
+     71  8102		       d0 f8		      bne	.loop2
+     72  8104		       e6 03		      inc	temp01
+     73  8106				   .loop3
+     74  8106		       b1 02		      lda	(temp00),y
+     75  8108		       8d 07 20 	      sta	PPU_DATA
+     76  810b		       c8		      iny
+     77  810c		       d0 f8		      bne	.loop3
+     78  810e		       60		      rts
+     79  810f
+     80  810f
+     81  810f
+     82  810f				   shift_divide_7_into_8 subroutine
+     83  810f							; kills x
+     84  810f							; temp00 dividend
+     85  810f							; temp01 divisor
+     86  810f							; RETURNS
+     87  810f							; A = remainder
+     88  810f							; temp00 = result
+     89  810f							; temp01 = remainder
+     90  810f		       a2 08		      ldx	#$08
+     91  8111		       a9 00		      lda	#$00
+     92  8113		       18		      clc
+     93  8114				   .loop
+     94  8114		       06 02		      asl	temp00
+     95  8116		       2a		      rol
+     96  8117		       c5 03		      cmp	temp01
+     97  8119		       90 04		      bcc	.no_sub
+     98  811b		       e5 03		      sbc	temp01
+     99  811d		       e6 02		      inc	temp00
+    100  811f				   .no_sub
+    101  811f		       ca		      dex
+    102  8120		       d0 f2		      bne	.loop
+    103  8122		       85 03		      sta	temp01
+    104  8124		       60		      rts
+    105  8125
+    106  8125
+    107  8125				   shift_divide_7_into_16 subroutine
+    108  8125							; kills x
+    109  8125							; temp00 dividend lo
+    110  8125							; temp01 dividend hi
+    111  8125							; temp02 divisor
+    112  8125							; RETURNS
+    113  8125							; A = remainder
+    114  8125							; temp00 = result
+    115  8125							; temp01 = remainder
+    116  8125		       a2 10		      ldx	#16
+    117  8127		       a9 00		      lda	#0
+    118  8129				   .loop
+    119  8129		       06 02		      asl	temp00
+    120  812b		       26 03		      rol	temp01
+    121  812d		       2a		      rol
+    122  812e		       c5 04		      cmp	temp02
+    123  8130		       90 04		      bcc	.no_sub
+    124  8132		       e5 04		      sbc	temp02
+    125  8134		       e6 02		      inc	temp00
+    126  8136				   .no_sub
+    127  8136		       ca		      dex
+    128  8137		       d0 f0		      bne	.loop
+    129  8139		       85 03		      sta	temp01
+    130  813b		       60		      rts
+    131  813c
+    132  813c
+    133  813c				   shift_divide_15_into_16 subroutine
+    134  813c							; kills x y
+    135  813c							; temp00 = dividend lo
+    136  813c							; temp01 = dividend hi
+    137  813c							; temp02 = divisor lo
+    138  813c							; temp03 = divisor hi
+    139  813c							; RETURNS
+    140  813c							; temp00 = result (lo only)
+    141  813c							; temp04 = remainder lo
+    142  813c							; temp05 = remainder hi
+    143  813c
+    144  813c		       a9 00		      lda	#0	; zero out remainder
+    145  813e		       85 06		      sta	temp04
+    146  8140		       85 07		      sta	temp05
+    147  8142		       a2 10		      ldx	#16
+    148  8144
+    149  8144				   .loop
+    150  8144		       06 02		      asl	temp00
+    151  8146		       26 03		      rol	temp01
+    152  8148		       26 06		      rol	temp04
+    153  814a		       26 07		      rol	temp05
+    154  814c		       a5 06		      lda	temp04
+    155  814e		       38		      sec
+    156  814f		       e5 04		      sbc	temp02	; check if divisor fits
+    157  8151		       a8		      tay
+    158  8152		       a5 07		      lda	temp05
+    159  8154		       e5 05		      sbc	temp03
+    160  8156		       90 06		      bcc	.skip
+    161  8158		       85 07		      sta	temp05
+    162  815a		       84 06		      sty	temp04
+    163  815c		       e6 02		      inc	temp00	; XXX could add result hi byte 
+    164  815e				   .skip
+    165  815e		       ca		      dex
+    166  815f		       d0 e3		      bne	.loop
+    167  8161		       60		      rts
+    168  8162
+    169  8162
+    170  8162				   shift_multiply subroutine
+    171  8162							; shift + add multiplication
+    172  8162							; kills x
+    173  8162							; temp00, temp01 in = factors
+    174  8162							; returns little endian 16bit val
+    175  8162							;	   at temp01, temp00
+    176  8162		       a9 00		      lda	#$00
+    177  8164		       a2 08		      ldx	#$08
+    178  8166		       46 02		      lsr	temp00
+    179  8168				   .loop
+    180  8168		       90 03		      bcc	.no_add
+    181  816a		       18		      clc
+    182  816b		       65 03		      adc	temp01
+    183  816d				   .no_add
+    184  816d		       6a		      ror
+    185  816e		       66 02		      ror	temp00
+    186  8170		       ca		      dex
+    187  8171		       d0 f5		      bne	.loop
+    188  8173		       85 03		      sta	temp01
+    189  8175		       60		      rts
+    190  8176
+    191  8176
+    192  8176				   shift_percent subroutine
+    193  8176							; a = 8bit base value
+    194  8176							; x = 8bit percentage
+    195  8176							; returns result in a
+    196  8176		       85 02		      sta	temp00
+    197  8178		       8a		      txa
+    198  8179		       49 ff		      eor	#$ff
+    199  817b		       85 03		      sta	temp01
+    200  817d		       a9 00		      lda	#$00	; 12 cycles
+    201  817f		       46 02		      lsr	temp00
+    202  8181		       06 03		      asl	temp01
+    203  8183		       b0 02		      bcs	.not_7
+    204  8185		       65 02		      adc	temp00
+    205  8187				   .not_7		; +15 per bit
+    206  8187		       46 02		      lsr	temp00
+    207  8189		       06 03		      asl	temp01
+    208  818b		       b0 02		      bcs	.not_6
+    209  818d		       65 02		      adc	temp00
+    210  818f				   .not_6
+    211  818f		       46 02		      lsr	temp00
+    212  8191		       06 03		      asl	temp01
+    213  8193		       b0 02		      bcs	.not_5
+    214  8195		       65 02		      adc	temp00
+    215  8197				   .not_5
+    216  8197		       46 02		      lsr	temp00
+    217  8199		       06 03		      asl	temp01
+    218  819b		       b0 02		      bcs	.not_4
+    219  819d		       65 02		      adc	temp00
+    220  819f				   .not_4
+    221  819f		       46 02		      lsr	temp00
+    222  81a1		       06 03		      asl	temp01
+    223  81a3		       b0 02		      bcs	.not_3
+    224  81a5		       65 02		      adc	temp00
+    225  81a7				   .not_3
+    226  81a7		       46 02		      lsr	temp00
+    227  81a9		       06 03		      asl	temp01
+    228  81ab		       b0 02		      bcs	.not_2
+    229  81ad		       65 02		      adc	temp00
+    230  81af				   .not_2
+    231  81af		       46 02		      lsr	temp00
+    232  81b1		       06 03		      asl	temp01
+    233  81b3		       b0 02		      bcs	.not_1
+    234  81b5		       65 02		      adc	temp00
+    235  81b7				   .not_1
+    236  81b7		       46 02		      lsr	temp00
+    237  81b9		       06 03		      asl	temp01
+    238  81bb		       b0 02		      bcs	.not_0
+    239  81bd		       65 02		      adc	temp00
+    240  81bf				   .not_0		; 15 * 7 + 12
+    241  81bf		       60		      rts		; +6 = 123 cycles
+    242  81c0
+    243  81c0
+    244  81c0				   registers_clear subroutine
+    245  81c0		       a9 00		      lda	#$00
+    246  81c2		       85 02		      sta	temp00
+    247  81c4		       85 03		      sta	temp01
+    248  81c6		       85 04		      sta	temp02
+    249  81c8		       85 05		      sta	temp03
+    250  81ca		       85 06		      sta	temp04
+    251  81cc		       85 07		      sta	temp05
+    252  81ce		       85 0a		      sta	state00
+    253  81d0		       85 0b		      sta	state01
+    254  81d2		       85 0c		      sta	state02
+    255  81d4		       85 0d		      sta	state03
+    256  81d6		       85 0e		      sta	state04
+    257  81d8		       85 0f		      sta	state05
+    258  81da		       85 10		      sta	state06
+    259  81dc		       85 11		      sta	state07
+    260  81de		       60		      rts
+    261  81df
+    262  81df
+    263  81df				   rand       subroutine
+    264  81df		       a5 12		      lda	rng0
+    265  81e1		       4a		      lsr
+    266  81e2		       90 02		      bcc	.no_ex_or
+    267  81e4		       49 d4		      eor	#$d4
+    268  81e6				   .no_ex_or
+    269  81e6		       85 12		      sta	rng0
+    270  81e8		       60		      rts
+    271  81e9
+    272  81e9				   rng_next   subroutine
+    273  81e9		       4a		      lsr
+    274  81ea		       90 02		      bcc	.NoEor
+    275  81ec		       49 d4		      eor	#$d4
+    276  81ee				   .NoEor
+    277  81ee		       60		      rts
+    278  81ef
+    279  81ef				   rng_prev   subroutine
+    280  81ef		       0a		      asl
+    281  81f0		       90 02		      bcc	.NoEor
+    282  81f2		       49 a9		      eor	#$a9
+    283  81f4				   .NoEor
+    284  81f4		       60		      rts
+    285  81f5
+    286  81f5							; THESE ARE RIPPED FROM SMB2
+    287  81f5				   rng_seed   subroutine
+    288  81f5		       a9 86		      lda	#$86
+    289  81f7		       85 2d		      sta	rng_seed0
+    290  81f9		       60		      rts
+    291  81fa
+    292  81fa				   rng_update subroutine
+    293  81fa							; destroys Y
+    294  81fa		       a0 00		      ldy	#$00
+    295  81fc		       20 00 82 	      jsr	rng_update_inner
+    296  81ff		       c8		      iny
+    297  8200				   rng_update_inner
+    298  8200		       a5 2d		      lda	rng_seed0
+    299  8202		       0a		      asl
+    300  8203		       0a		      asl
+    301  8204		       38		      sec
+    302  8205		       65 2d		      adc	rng_seed0
+    303  8207		       85 2d		      sta	rng_seed0
+    304  8209		       06 2e		      asl	rng_seed1
+    305  820b		       a9 20		      lda	#$20
+    306  820d		       24 2e		      bit	rng_seed1
+    307  820f		       90 04		      bcc	rng_reverse
+    308  8211		       f0 06		      beq	rng_eor
+    309  8213		       d0 02		      bne	rng_inc_eor
+    310  8215				   rng_reverse
+    311  8215		       d0 02		      bne	rng_eor
+    312  8217				   rng_inc_eor
+    313  8217		       e6 2e		      inc	rng_seed1
+    314  8219				   rng_eor
+    315  8219		       a5 2e		      lda	rng_seed1
+    316  821b		       45 2d		      eor	rng_seed0
+    317  821d		       99 2f 00 	      sta	rng_val0,y
+    318  8220		       60		      rts
+    319  8221
+    320  8221
+    321  8221				   render_enable
+    322  8221		       a9 90		      lda	#CTRL_NMI|CTRL_BG_1000
+    323  8223		       8d 00 20 	      sta	PPU_CTRL	; enable NMI
+    324  8226		       a5 16		      lda	ppu_mask_emph
+    325  8228		       09 1e		      ora	#MASK_BG|MASK_SPR|MASK_SPR_CLIP|MASK_BG_CLIP
+    326  822a		       8d 01 20 	      sta	PPU_MASK	; enable rendering
+    327  822d		       60		      rts
+    328  822e
+    329  822e
+    330  822e				   render_disable
+    331  822e		       a9 00		      lda	#$00
+    332  8230		       8d 01 20 	      sta	PPU_MASK
+    333  8233		       8d 00 20 	      sta	PPU_CTRL
+    334  8236		       60		      rts
+    335  8237
+    336  8237
+    337  8237				   vsync_wait
+    338  8237		       2c 02 20 	      bit	PPU_STATUS
+    339  823a		       10 fb		      bpl	vsync_wait
+    340  823c		       60		      rts
+    341  823d
+    342  823d
+    343  823d
+    344  823d
+    345  823d				   collision_detect subroutine
+    346  823d							; returns true/false in a
+    347  823d		       18		      clc
+    348  823e		       a5 21		      lda	collision_0_x
+    349  8240		       65 23		      adc	collision_0_w
+    350  8242		       b0 22		      bcs	.no_collision	; make sure x+w is not less than x
+    351  8244		       c5 25		      cmp	collision_1_x
+    352  8246		       90 1e		      bcc	.no_collision
+    353  8248		       18		      clc
+    354  8249		       a5 25		      lda	collision_1_x
+    355  824b		       65 27		      adc	collision_1_w
+    356  824d		       c5 21		      cmp	collision_0_x
+    357  824f		       90 15		      bcc	.no_collision
+    358  8251		       18		      clc
+    359  8252		       a5 22		      lda	collision_0_y
+    360  8254		       65 24		      adc	collision_0_h
+    361  8256		       c5 26		      cmp	collision_1_y
+    362  8258		       90 0c		      bcc	.no_collision
+    363  825a		       18		      clc
+    364  825b		       a5 26		      lda	collision_1_y
+    365  825d		       65 28		      adc	collision_1_h
+    366  825f		       c5 22		      cmp	collision_0_y
+    367  8261		       90 03		      bcc	.no_collision
+    368  8263				   .collision
+    369  8263		       a9 ff		      lda	#$ff
+    370  8265		       60		      rts
+    371  8266				   .no_collision
+    372  8266		       a9 00		      lda	#$00
+    373  8268		       60		      rts
+    374  8269
+    375  8269
+    376  8269
+    377  8269				   distance   subroutine
+    378  8269							; returns distance in a
+    379  8269		       38		      sec
+    380  826a		       a5 21		      lda	collision_0_x
+    381  826c		       e5 25		      sbc	collision_1_x
+    382  826e		       b0 04		      bcs	.x_done
+    383  8270		       49 ff		      eor	#$ff	; abs()
+    384  8272		       69 01		      adc	#$01
+    385  8274				   .x_done
+    386  8274		       85 02		      sta	temp00	; x distance
+    387  8276		       38		      sec
+    388  8277		       a5 22		      lda	collision_0_y
+    389  8279		       e5 26		      sbc	collision_1_y
+    390  827b		       b0 04		      bcs	.y_done
+    391  827d		       49 ff		      eor	#$ff	; abs()
+    392  827f		       69 01		      adc	#$01
+    393  8281				   .y_done
+    394  8281		       85 03		      sta	temp01	; y distance
+    395  8283							; check which is larger
+    396  8283							; then: max + min / 2
+    397  8283		       a5 02		      lda	temp00
+    398  8285		       c5 03		      cmp	temp01
+    399  8287		       b0 07		      bcs	.y_smaller
+    400  8289				   .x_smaller
+    401  8289		       a5 02		      lda	temp00
+    402  828b		       4a		      lsr
+    403  828c		       18		      clc
+    404  828d		       65 03		      adc	temp01
+    405  828f		       60		      rts
+    406  8290				   .y_smaller
+    407  8290		       a5 03		      lda	temp01
+    408  8292		       4a		      lsr
+    409  8293		       18		      clc
+    410  8294		       65 02		      adc	temp00
+    411  8296		       60		      rts
+    412  8297
+    413  8297
+    414  8297
+    415  8297							;;;;; CONTROLLER READING
+    416  8297
+    417  8297				   BUTTON_A   EQM	1 << 7
+    418  8297				   BUTTON_B   EQM	1 << 6
+    419  8297				   BUTTON_SELECT EQM	1 << 5
+    420  8297				   BUTTON_START EQM	1 << 4
+    421  8297				   BUTTON_UP  EQM	1 << 3
+    422  8297				   BUTTON_DOWN EQM	1 << 2
+    423  8297				   BUTTON_LEFT EQM	1 << 1
+    424  8297				   BUTTON_RIGHT EQM	1 << 0
+    425  8297
+    426  8297				   controller_poller subroutine
+    427  8297		       a2 01		      ldx	#$01
+    428  8299		       8e 16 40 	      stx	JOYPAD1
+    429  829c		       ca		      dex
+    430  829d		       8e 16 40 	      stx	JOYPAD1
+    431  82a0		       a2 08		      ldx	#$08
+    432  82a2				   .read_loop
+    433  82a2		       ad 16 40 	      lda	JOYPAD1
+    434  82a5		       4a		      lsr
+    435  82a6		       26 02		      rol	temp00
+    436  82a8		       4a		      lsr
+    437  82a9		       26 03		      rol	temp01
+    438  82ab		       ca		      dex
+    439  82ac		       d0 f4		      bne	.read_loop
+    440  82ae		       a5 02		      lda	temp00
+    441  82b0		       05 03		      ora	temp01
+    442  82b2		       85 02		      sta	temp00
+    443  82b4		       60		      rts
+    444  82b5
+    445  82b5				   controller_read subroutine
+    446  82b5		       20 97 82 	      jsr	controller_poller
+    447  82b8				   .checksum_loop
+    448  82b8		       a4 02		      ldy	temp00
+    449  82ba		       20 97 82 	      jsr	controller_poller
+    450  82bd		       c4 02		      cpy	temp00
+    451  82bf		       d0 f7		      bne	.checksum_loop
+    452  82c1		       a5 02		      lda	temp00
+    453  82c3		       a8		      tay
+    454  82c4		       45 14		      eor	controls
+    455  82c6		       25 02		      and	temp00
+    456  82c8		       85 15		      sta	controls_d
+    457  82ca		       84 14		      sty	controls
+    458  82cc		       60		      rts
+    459  82cd
+    460  82cd
+    461  82cd				   sine_table
+    462  82cd		       80 83 86 89*	      hex	808386898c8f9295
+    463  82d5		       98 9b 9e a2*	      hex	989b9ea2a5a7aaad
+    464  82dd		       b0 b3 b6 b9*	      hex	b0b3b6b9bcbec1c4
+    465  82e5		       c6 c9 cb ce*	      hex	c6c9cbced0d3d5d7
+    466  82ed		       da dc de e0*	      hex	dadcdee0e2e4e6e8
+    467  82f5		       ea eb ed ee*	      hex	eaebedeef0f1f3f4
+    468  82fd		       f5 f6 f8 f9*	      hex	f5f6f8f9fafafbfc
+    469  8305		       fd fd fe fe*	      hex	fdfdfefefeffffff
+    470  830d		       ff ff ff ff*	      hex	fffffffffefefefd
+    471  8315		       fd fc fb fa*	      hex	fdfcfbfafaf9f8f6
+    472  831d		       f5 f4 f3 f1*	      hex	f5f4f3f1f0eeedeb
+    473  8325		       ea e8 e6 e4*	      hex	eae8e6e4e2e0dedc
+    474  832d		       da d7 d5 d3*	      hex	dad7d5d3d0cecbc9
+    475  8335		       c6 c4 c1 be*	      hex	c6c4c1bebcb9b6b3
+    476  833d		       b0 ad aa a7*	      hex	b0adaaa7a5a29e9b
+    477  8345		       98 95 92 8f*	      hex	9895928f8c898683
+    478  834d		       80 7c 79 76*	      hex	807c797673706d6a
+    479  8355		       67 64 61 5d*	      hex	6764615d5a585552
+    480  835d		       4f 4c 49 46*	      hex	4f4c494643413e3b
+    481  8365		       39 36 34 31*	      hex	393634312f2c2a28
+    482  836d		       25 23 21 1f*	      hex	2523211f1d1b1917
+    483  8375		       15 14 12 11*	      hex	151412110f0e0c0b
+    484  837d		       0a 09 07 06*	      hex	0a09070605050403
+    485  8385		       02 02 01 01*	      hex	0202010101000000
+    486  838d		       00 00 00 00*	      hex	0000000001010102
+    487  8395		       02 03 04 05*	      hex	0203040505060709
+    488  839d		       0a 0b 0c 0e*	      hex	0a0b0c0e0f111214
+    489  83a5		       15 17 19 1b*	      hex	1517191b1d1f2123
+    490  83ad		       25 28 2a 2c*	      hex	25282a2c2f313436
+    491  83b5		       39 3b 3e 41*	      hex	393b3e414346494c
+    492  83bd		       4f 52 55 58*	      hex	4f5255585a5d6164
+    493  83c5		       67 6a 6d 70*	      hex	676a6d707376797c
+    494  83cd
+    495  83cd
+    496  83cd
+    497  83cd				   decimal_x9_text_offset_80
+    498  83cd		       00 80 00 81*	      hex	0080008100820083008400850086008700880089
+    499  83e1		       81 80 81 81*	      hex	8180818181828183818481858186818781888189
+    500  83f5		       82 80 82 81*	      hex	8280828182828283828482858286828782888289
+    501  8409		       83 80 83 81*	      hex	8380838183828383838483858386838783888389
+    502  841d		       84 80 84 81*	      hex	8480848184828483848484858486848784888489
+    503  8431		       85 80 85 81*	      hex	8580858185828583858485858586858785888589
+    504  8445		       86 80 86 81*	      hex	8680868186828683868486858686868786888689
+    505  8459		       87 80 87 81*	      hex	8780878187828783878487858786878787888789
+    506  846d		       88 80 88 81*	      hex	8880888188828883888488858886888788888889
+    507  8481		       89 80 89 81*	      hex	8980898189828983898489858986898789888989
+    508  8495				   decimal_99_text_offset_80
+    509  8495		       80 80 80 81*	      hex	8080808180828083808480858086808780888089
+    510  84a9		       81 80 81 81*	      hex	8180818181828183818481858186818781888189
+    511  84bd		       82 80 82 81*	      hex	8280828182828283828482858286828782888289
+    512  84d1		       83 80 83 81*	      hex	8380838183828383838483858386838783888389
+    513  84e5		       84 80 84 81*	      hex	8480848184828483848484858486848784888489
+    514  84f9		       85 80 85 81*	      hex	8580858185828583858485858586858785888589
+    515  850d		       86 80 86 81*	      hex	8680868186828683868486858686868786888689
+    516  8521		       87 80 87 81*	      hex	8780878187828783878487858786878787888789
+    517  8535		       88 80 88 81*	      hex	8880888188828883888488858886888788888889
+    518  8549		       89 80 89 81*	      hex	8980898189828983898489858986898789888989
+    519  855d
+------- FILE makrotrak.asm
+     17  855d
+------- FILE ent.asm LEVEL 2 PASS 2
+      0  855d					      include	"ent.asm"
+      1  855d
+      2  855d				   ents_max   eqm	#$1f
+      3  855d
+      4  855d
+      5  855d				   ent_find_slot subroutine
+      6  855d							; returns empty slot in x
+      7  855d							; x = 0xff if none found
+      8  855d		       a2 00		      ldx	#$00
+      9  855f				   .loop
+     10  855f		       bd 00 04 	      lda	ent_type,x
+     11  8562		       f0 07		      beq	.slot_found
+     12  8564		       e8		      inx
+     13  8565		       e0 1f		      cpx	#ents_max
+     14  8567		       d0 f6		      bne	.loop
+     15  8569		       a2 ff		      ldx	#$ff
+     16  856b				   .slot_found
+     17  856b		       60		      rts
+     18  856c
+     19  856c
+     20  856c
+     21  856c				   ents_update subroutine
+     22  856c							; debug visualization on
+     23  856c							;lda #%00011111 ; b/w
+     24  856c							;lda #%11111110 ; emph
+     25  856c							;sta PPU_MASK
+     26  856c
+     27  856c							; don't corrupt y in ent render functions
+     28  856c		       a0 10		      ldy	#$10
+     29  856e		       84 20		      sty	ent_spr_ptr
+     30  8570
+     31  8570		       a5 1f		      lda	ent_slot_start
+     32  8572		       18		      clc
+     33  8573		       69 07		      adc	#$07
+     34  8575		       29 1f		      and	#$1f
+     35  8577		       85 1f		      sta	ent_slot_start
+     36  8579		       85 1e		      sta	ent_slot
+     37  857b
+     38  857b							; sprites_clear
+     39  857b		       a9 ff		      lda	#$ff
+     40  857d		       a2 00		      ldx	#$00
+     41  857f				   .loop
+     42  857f		       9d 00 02 	      sta	$0200,x
+     43  8582		       e8		      inx
+     44  8583		       e8		      inx
+     45  8584		       e8		      inx
+     46  8585		       e8		      inx
+     47  8586		       d0 f7		      bne	.loop
+     48  8588
+     49  8588		       a5 00		      lda	wtf
+     50  858a		       4a		      lsr
+     51  858b		       29 01		      and	#$01
+     52  858d		       f0 02		      beq	.update_forward_loop
+     53  858f		       d0 1b		      bne	.update_backward_loop
+     54  8591
+     55  8591				   .update_forward_loop
+     56  8591		       a6 1e		      ldx	ent_slot
+     57  8593		       bd 00 04 	      lda	ent_type,x
+     58  8596		       f0 05		      beq	.skip_forward_ent_slot
+     59  8598		       20 c7 85 	      jsr	ents_update_jump
+     60  859b		       84 20		      sty	ent_spr_ptr
+     61  859d				   .skip_forward_ent_slot
+     62  859d		       e6 1e		      inc	ent_slot
+     63  859f		       a5 1e		      lda	ent_slot
+     64  85a1		       29 1f		      and	#ents_max
+     65  85a3		       85 1e		      sta	ent_slot
+     66  85a5		       c5 1f		      cmp	ent_slot_start
+     67  85a7		       d0 e8		      bne	.update_forward_loop
+     68  85a9		       4c c6 85 	      jmp	.updates_done
+     69  85ac
+     70  85ac				   .update_backward_loop
+     71  85ac		       a6 1e		      ldx	ent_slot
+     72  85ae		       bd 00 04 	      lda	ent_type,x
+     73  85b1		       f0 05		      beq	.skip_backward_ent_slot
+     74  85b3		       20 c7 85 	      jsr	ents_update_jump
+     75  85b6		       84 20		      sty	ent_spr_ptr
+     76  85b8				   .skip_backward_ent_slot
+     77  85b8		       c6 1e		      dec	ent_slot
+     78  85ba		       a5 1e		      lda	ent_slot
+     79  85bc		       10 04		      bpl	.dont_reset_ent_slot
+     80  85be		       a9 1f		      lda	#ents_max
+     81  85c0		       85 1e		      sta	ent_slot
+     82  85c2				   .dont_reset_ent_slot
+     83  85c2		       c5 1f		      cmp	ent_slot_start
+     84  85c4		       d0 e6		      bne	.update_backward_loop
+     85  85c6
+     86  85c6				   .updates_done
+     87  85c6							; debug visualization off
+     88  85c6							;lda #%00011110
+     89  85c6							;sta PPU_MASK
+     90  85c6		       60		      rts
+     91  85c7
+     92  85c7
+     93  85c7				   ents_update_jump subroutine
+     94  85c7		       aa		      tax
+     95  85c8		       bd df 85 	      lda	ent_update_lo,x
+     96  85cb		       85 02		      sta	temp00
+     97  85cd		       bd e2 85 	      lda	ent_update_hi,x
+     98  85d0		       85 03		      sta	temp01
+     99  85d2		       a6 1e		      ldx	ent_slot
+    100  85d4		       a4 20		      ldy	ent_spr_ptr
+    101  85d6		       6c 02 00 	      jmp	(temp00)
+    102  85d9
+    103  85d9
+    104  85d9
+    105  85d9					      MAC	ent_despawn
+    106  85d9					      lda	#$00
+    107  85d9					      sta	ent_type,x
+    108  85d9					      sta	ent_spawn,x
+    109  85d9					      sta	ent_x_hi,x
+    110  85d9					      sta	ent_x,x
+    111  85d9					      sta	ent_x_lo,x
+    112  85d9					      sta	ent_y,x
+    113  85d9					      sta	ent_y_lo,x
+    114  85d9					      sta	ent_h,x
+    115  85d9					      sta	ent_h_lo,x
+    116  85d9					      sta	ent_v,x
+    117  85d9					      sta	ent_v_lo,x
+    118  85d9					      sta	ent_dir,x
+    119  85d9					      sta	ent_hp,x
+    120  85d9					      sta	ent_dmg,x
+    121  85d9					      sta	ent_hit,x
+    122  85d9					      sta	ent_r0,x
+    123  85d9					      sta	ent_r1,x
+    124  85d9					      sta	ent_r2,x
+    125  85d9					      sta	ent_r3,x
+    126  85d9					      sta	ent_r4,x
+    127  85d9					      sta	ent_r5,x
+    128  85d9					      sta	ent_r6,x
+    129  85d9					      sta	ent_r7,x
+    130  85d9					      sta	ent_r8,x
+    131  85d9					      ENDM
+    132  85d9
+    133  85d9
+------- FILE makrotrak.asm
+------- FILE ent_tables.asm LEVEL 2 PASS 2
+      0  85d9					      include	"ent_tables.asm"
+      1  85d9				   ent_nothing_id eqm	$00
+      2  85d9				   ent_ball_id eqm	$01
+      3  85d9				   ent_laser_id eqm	$02
+      4  85d9
+      5  85d9
+      6  85d9				   ent_spawn_lo
+      7  85d9		       aa		      byte.b	<do_nothing
+      8  85da		       e5		      byte.b	<ent_ball_spawn
+      9  85db		       3c		      byte.b	<ent_laser_spawn
+     10  85dc				   ent_spawn_hi
+     11  85dc		       80		      byte.b	>do_nothing
+     12  85dd		       85		      byte.b	>ent_ball_spawn
+     13  85de		       86		      byte.b	>ent_laser_spawn
+     14  85df
+     15  85df				   ent_update_lo
+     16  85df		       aa		      byte.b	<do_nothing
+     17  85e0		       fb		      byte.b	<ent_ball_update
+     18  85e1		       52		      byte.b	<ent_laser_update
+     19  85e2				   ent_update_hi
+     20  85e2		       80		      byte.b	>do_nothing
+     21  85e3		       85		      byte.b	>ent_ball_update
+     22  85e4		       86		      byte.b	>ent_laser_update
+------- FILE makrotrak.asm
+------- FILE ents/ball.asm LEVEL 2 PASS 2
+      0  85e5					      include	"ents/ball.asm"
+      1  85e5
+      2  85e5				   ent_ball_spawn subroutine
+      3  85e5		       20 5d 85 	      jsr	ent_find_slot
+      4  85e8		       8a		      txa
+      5  85e9		       30 0f		      bmi	.done
+      6  85eb		       a9 01		      lda	#ent_ball_id
+      7  85ed		       9d 00 04 	      sta	ent_type,x
+      8  85f0							; load baddie position
+      9  85f0		       a5 07		      lda	temp05
+     10  85f2		       9d 60 04 	      sta	ent_x,x
+     11  85f5		       a5 08		      lda	temp06
+     12  85f7		       9d a0 04 	      sta	ent_y,x
+     13  85fa				   .done
+     14  85fa		       60		      rts
+     15  85fb
+     16  85fb
+     17  85fb				   ent_ball_update subroutine
+     18  85fb
+     19  85fb		       bd 80 04 	      lda	ent_x_lo,x
+     20  85fe		       18		      clc
+     21  85ff		       69 97		      adc	#$97
+     22  8601		       9d 80 04 	      sta	ent_x_lo,x
+     23  8604		       bd 60 04 	      lda	ent_x,x
+     24  8607		       69 01		      adc	#$01
+     25  8609		       9d 60 04 	      sta	ent_x,x
+     26  860c
+     27  860c		       a5 00		      lda	wtf
+     28  860e		       29 07		      and	#$07
+     29  8610		       d0 0f		      bne	.dont_spawn_laser
+     30  8612		       bd 60 04 	      lda	ent_x,x
+     31  8615		       85 07		      sta	temp05
+     32  8617		       bd a0 04 	      lda	ent_y,x
+     33  861a		       85 08		      sta	temp06
+     34  861c		       20 3c 86 	      jsr	ent_laser_spawn
+     35  861f		       a6 1e		      ldx	ent_slot
+     36  8621				   .dont_spawn_laser
+     37  8621
+     38  8621
+     39  8621				   ent_ball_render subroutine
+     40  8621
+     41  8621		       bd 60 04 	      lda	ent_x,x
+     42  8624		       99 03 02 	      sta	spr_x,y
+     43  8627		       bd a0 04 	      lda	ent_y,x
+     44  862a		       99 00 02 	      sta	spr_y,y
+     45  862d
+     46  862d		       a9 00		      lda	#$00
+     47  862f		       99 02 02 	      sta	spr_a,y
+     48  8632
+     49  8632		       a9 30		      lda	#$30
+     50  8634		       99 01 02 	      sta	spr_p,y
+     51  8637
+     52  8637		       c8		      iny
+     53  8638		       c8		      iny
+     54  8639		       c8		      iny
+     55  863a		       c8		      iny
+     56  863b
+     57  863b		       60		      rts
+------- FILE makrotrak.asm
+------- FILE ents/laser.asm LEVEL 2 PASS 2
+      0  863c					      include	"ents/laser.asm"
+      1  863c
+      2  863c				   ent_laser_spawn subroutine
+      3  863c		       20 5d 85 	      jsr	ent_find_slot
+      4  863f		       8a		      txa
+      5  8640		       30 0f		      bmi	.done
+      6  8642		       a9 02		      lda	#ent_laser_id
+      7  8644		       9d 00 04 	      sta	ent_type,x
+      8  8647							; load baddie position
+      9  8647		       a5 07		      lda	temp05
+     10  8649		       9d 60 04 	      sta	ent_x,x
+     11  864c		       a5 08		      lda	temp06
+     12  864e		       9d a0 04 	      sta	ent_y,x
+     13  8651				   .done
+     14  8651		       60		      rts
+     15  8652
+     16  8652
+     17  8652				   ent_laser_update subroutine
+     18  8652
+     19  8652
+     20  8652		       bd c0 04 	      lda	ent_y_lo,x
+     21  8655		       18		      clc
+     22  8656		       69 27		      adc	#$27
+     23  8658		       9d c0 04 	      sta	ent_y_lo,x
+     24  865b		       bd a0 04 	      lda	ent_y,x
+     25  865e		       69 02		      adc	#$02
+     26  8660		       9d a0 04 	      sta	ent_y,x
+     27  8663
+     28  8663		       c9 f9		      cmp	#249
+     29  8665		       d0 4b		      bne	.dont_despawn
+      0  8667					      ent_despawn
+      1  8667		       a9 00		      lda	#$00
+      2  8669		       9d 00 04 	      sta	ent_type,x
+      3  866c		       9d 20 04 	      sta	ent_spawn,x
+      4  866f		       9d 40 04 	      sta	ent_x_hi,x
+      5  8672		       9d 60 04 	      sta	ent_x,x
+      6  8675		       9d 80 04 	      sta	ent_x_lo,x
+      7  8678		       9d a0 04 	      sta	ent_y,x
+      8  867b		       9d c0 04 	      sta	ent_y_lo,x
+      9  867e		       9d e0 04 	      sta	ent_h,x
+     10  8681		       9d 00 05 	      sta	ent_h_lo,x
+     11  8684		       9d 20 05 	      sta	ent_v,x
+     12  8687		       9d 40 05 	      sta	ent_v_lo,x
+     13  868a		       9d 60 05 	      sta	ent_dir,x
+     14  868d		       9d 80 05 	      sta	ent_hp,x
+     15  8690		       9d a0 05 	      sta	ent_dmg,x
+     16  8693		       9d c0 05 	      sta	ent_hit,x
+     17  8696		       9d e0 05 	      sta	ent_r0,x
+     18  8699		       9d 00 06 	      sta	ent_r1,x
+     19  869c		       9d 20 06 	      sta	ent_r2,x
+     20  869f		       9d 40 06 	      sta	ent_r3,x
+     21  86a2		       9d 60 06 	      sta	ent_r4,x
+     22  86a5		       9d 80 06 	      sta	ent_r5,x
+     23  86a8		       9d a0 06 	      sta	ent_r6,x
+     24  86ab		       9d c0 06 	      sta	ent_r7,x
+     25  86ae		       9d e0 06 	      sta	ent_r8,x
+     31  86b1		       60		      rts
+     32  86b2				   .dont_despawn
+     33  86b2
+     34  86b2
+     35  86b2				   ent_laser_render subroutine
+     36  86b2
+     37  86b2		       bd 60 04 	      lda	ent_x,x
+     38  86b5		       99 03 02 	      sta	spr_x,y
+     39  86b8		       bd a0 04 	      lda	ent_y,x
+     40  86bb		       99 00 02 	      sta	spr_y,y
+     41  86be
+     42  86be		       a9 00		      lda	#$00
+     43  86c0		       99 02 02 	      sta	spr_a,y
+     44  86c3
+     45  86c3		       a9 21		      lda	#$21
+     46  86c5		       99 01 02 	      sta	spr_p,y
+     47  86c8
+     48  86c8		       c8		      iny
+     49  86c9		       c8		      iny
+     50  86ca		       c8		      iny
+     51  86cb		       c8		      iny
+     52  86cc
+     53  86cc		       60		      rts
+     54  86cd
+     55  86cd
+     56  86cd
+------- FILE makrotrak.asm
+     22  86cd
+------- FILE state.asm LEVEL 2 PASS 2
+      0  86cd					      include	"state.asm"
+      1  86cd
+      2  86cd
+      3  86cd
+      4  86cd					      MAC	state_set
+      5  86cd					      lda	#<{1}
+      6  86cd					      sta	state_jmp_lo
+      7  86cd					      lda	#>{1}
+      8  86cd					      sta	state_jmp_hi
+      9  86cd					      ENDM
+     10  86cd
+     11  86cd
+     12  86cd				   state_jmp_to subroutine
+     13  86cd							; lets us rts back to vectors
+     14  86cd							; banking could be added here
+     15  86cd		       6c 17 00 	      jmp	(state_jmp_lo)
+     16  86d0
+------- FILE makrotrak.asm
+------- FILE states/explore.asm LEVEL 2 PASS 2
+      0  86d0					      include	"states/explore.asm"
+      1  86d0
+      2  86d0				   state_explore_palette
+      3  86d0		       0c 11 12 1c	      hex	0c 11 12 1c
+      4  86d4		       0c 0c 21 3c	      hex	0c 0c 21 3c
+      5  86d8		       0c 06 16 27	      hex	0c 06 16 27
+      6  86dc		       0c 0c 21 3c	      hex	0c 0c 21 3c
+      7  86e0		       0c 0c 21 3c	      hex	0c 0c 21 3c
+      8  86e4		       0c 0c 21 3c	      hex	0c 0c 21 3c
+      9  86e8		       0c 0c 21 3c	      hex	0c 0c 21 3c
+     10  86ec		       0c 0c 21 3c	      hex	0c 0c 21 3c
+     11  86f0
+     12  86f0
+     13  86f0				   state_explore_init subroutine
+      0  86f0					      STATE_SET	state_explore_update
+      1  86f0		       a9 23		      lda	#<state_explore_update
+      2  86f2		       85 17		      sta	state_jmp_lo
+      3  86f4		       a9 87		      lda	#>state_explore_update
+      4  86f6		       85 18		      sta	state_jmp_hi
+     15  86f8
+     16  86f8		       20 2e 82 	      jsr	render_disable
+     17  86fb
+     18  86fb		       a9 3f		      lda	#$3f
+     19  86fd		       8d 06 20 	      sta	PPU_ADDR
+     20  8700		       a9 00		      lda	#$00
+     21  8702		       8d 06 20 	      sta	PPU_ADDR
+     22  8705		       a2 00		      ldx	#$00
+     23  8707				   .pal_load_loop
+     24  8707		       bd d0 86 	      lda	state_explore_palette,x
+     25  870a		       8d 07 20 	      sta	PPU_DATA
+     26  870d		       e8		      inx
+     27  870e		       e0 20		      cpx	#$20
+     28  8710		       d0 f5		      bne	.pal_load_loop
+     29  8712
+     30  8712		       a9 00		      lda	#<main_layout_nam
+     31  8714		       85 02		      sta	temp00
+     32  8716		       a9 80		      lda	#>main_layout_nam
+     33  8718		       85 03		      sta	temp01
+     34  871a		       a9 20		      lda	#$20
+     35  871c		       20 dc 80 	      jsr	nametable_load
+     36  871f
+     37  871f		       20 21 82 	      jsr	render_enable
+     38  8722
+     39  8722		       60		      rts
+     40  8723
+     41  8723
+     42  8723				   state_explore_update subroutine
+     43  8723		       60		      rts
+------- FILE makrotrak.asm
+------- FILE states/map.asm LEVEL 2 PASS 2
+      0  8724					      include	"states/map.asm"
+      1  8724
+      2  8724							; 00 no room
+      3  8724							; 01 empty room
+      4  8724							; 02 key
+      5  8724							; 40 exit
+      6  8724							; ff player start
+      7  8724
+      8  8724				   map_data_00
+      9  8724		       40 00 00 00*	      hex	40 00 00 00 00 00 00 00
+     10  872c		       01 00 00 01*	      hex	01 00 00 01 01 01 01 00
+     11  8734		       01 00 00 01*	      hex	01 00 00 01 00 00 01 01
+     12  873c		       01 01 01 01*	      hex	01 01 01 01 00 00 00 01
+     13  8744		       00 00 01 01*	      hex	00 00 01 01 00 00 00 02
+     14  874c		       00 01 01 01*	      hex	00 01 01 01 00 01 01 00
+     15  8754		       00 01 00 00*	      hex	00 01 00 00 00 01 01 01
+     16  875c		       ff 01 01 01*	      hex	ff 01 01 01 01 01 00 00
+------- FILE makrotrak.asm
+------- FILE states/title.asm LEVEL 2 PASS 2
+      0  8764					      include	"states/title.asm"
+      1  8764
+      2  8764				   state_title_palette
+      3  8764		       0f 01 22 35	      hex	0f 01 22 35
+      4  8768		       0f 01 22 35	      hex	0f 01 22 35
+      5  876c		       0f 01 22 35	      hex	0f 01 22 35
+      6  8770		       0f 01 22 35	      hex	0f 01 22 35
+      7  8774		       0f 01 22 35	      hex	0f 01 22 35
+      8  8778		       0f 01 22 35	      hex	0f 01 22 35
+      9  877c		       0f 01 22 35	      hex	0f 01 22 35
+     10  8780		       0f 01 22 35	      hex	0f 01 22 35
+     11  8784
+     12  8784
+     13  8784				   str_title
+     14  8784		       4d 41 4b 52*	      byte.b	"MAKROTRAK"
+     15  878d
+     16  878d
+     17  878d				   state_title_init subroutine
+      0  878d					      STATE_SET	state_title_update
+      1  878d		       a9 e2		      lda	#<state_title_update
+      2  878f		       85 17		      sta	state_jmp_lo
+      3  8791		       a9 87		      lda	#>state_title_update
+      4  8793		       85 18		      sta	state_jmp_hi
+     19  8795
+     20  8795		       20 2e 82 	      jsr	render_disable
+     21  8798
+     22  8798		       a9 3f		      lda	#$3f
+     23  879a		       8d 06 20 	      sta	PPU_ADDR
+     24  879d		       a9 00		      lda	#$00
+     25  879f		       8d 06 20 	      sta	PPU_ADDR
+     26  87a2		       a2 00		      ldx	#$00
+     27  87a4				   .pal_load_loop
+     28  87a4		       bd 64 87 	      lda	state_title_palette,x
+     29  87a7		       8d 07 20 	      sta	PPU_DATA
+     30  87aa		       e8		      inx
+     31  87ab		       e0 20		      cpx	#$20
+     32  87ad		       d0 f5		      bne	.pal_load_loop
+     33  87af
+     34  87af		       a9 20		      lda	#$20
+     35  87b1		       85 02		      sta	temp00
+     36  87b3		       a9 00		      lda	#$00
+     37  87b5		       85 03		      sta	temp01
+     38  87b7		       a9 00		      lda	#$00
+     39  87b9		       20 ab 80 	      jsr	nametable_fill
+     40  87bc
+     41  87bc		       a9 21		      lda	#$21
+     42  87be		       8d 06 20 	      sta	PPU_ADDR
+     43  87c1		       a9 8c		      lda	#$8c
+     44  87c3		       8d 06 20 	      sta	PPU_ADDR
+     45  87c6		       a2 00		      ldx	#$00
+     46  87c8				   .title_loop
+     47  87c8		       bd 84 87 	      lda	str_title,x
+     48  87cb		       8d 07 20 	      sta	PPU_DATA
+     49  87ce		       e8		      inx
+     50  87cf		       e0 09		      cpx	#$09
+     51  87d1		       d0 f5		      bne	.title_loop
+     52  87d3
+     53  87d3		       20 21 82 	      jsr	render_enable
+     54  87d6
+     55  87d6		       a9 00		      lda	#$00
+     56  87d8		       85 07		      sta	temp05
+     57  87da		       a9 20		      lda	#$20
+     58  87dc		       85 08		      sta	temp06
+     59  87de		       20 e5 85 	      jsr	ent_ball_spawn
+     60  87e1
+     61  87e1		       60		      rts
+     62  87e2
+     63  87e2
+     64  87e2
+     65  87e2				   state_title_update subroutine
+     66  87e2		       a5 15		      lda	controls_d
+     67  87e4		       f0 00		      beq	.do_nothing
+     68  87e6							;jsr state_explore_init
+     69  87e6				   .do_nothing
+     70  87e6
+     71  87e6		       20 6c 85 	      jsr	ents_update
+     72  87e9
+     73  87e9		       a5 14		      lda	controls
+     74  87eb		       f0 21		      beq	.no_triangle
+     75  87ed				   .do_triangle
+     76  87ed		       a9 7f		      lda	#$7f
+     77  87ef		       8d 08 40 	      sta	$4008
+     78  87f2		       a9 f8		      lda	#$f8
+     79  87f4		       8d 0a 40 	      sta	$400a
+     80  87f7		       a9 03		      lda	#$03
+     81  87f9		       09 f8		      ora	#%11111000
+     82  87fb		       8d 0b 40 	      sta	$400b
+     83  87fe		       a9 80		      lda	#$80
+     84  8800		       8d ff 02 	      sta	spr_x+$fc
+     85  8803		       8d fc 02 	      sta	spr_y+$fc
+     86  8806		       a9 2a		      lda	#$2a
+     87  8808		       8d fd 02 	      sta	spr_p+$fc
+     88  880b		       4c 1b 88 	      jmp	.triangle_done
+     89  880e				   .no_triangle
+     90  880e		       a9 00		      lda	#$00
+     91  8810		       8d 08 40 	      sta	$4008
+     92  8813		       8d 0b 40 	      sta	$400b
+     93  8816		       a9 e0		      lda	#$e0
+     94  8818		       8d fc 02 	      sta	spr_y+$fc
+     95  881b				   .triangle_done
+     96  881b
+     97  881b
+     98  881b		       60		      rts
+------- FILE makrotrak.asm
+------- FILE states/win.asm LEVEL 2 PASS 2
+      0  881c					      include	"states/win.asm"
+------- FILE makrotrak.asm
+     28  881c
+     29  e000					      org	$0e000
+     30  e000					      rorg	$e000
+     31  e000
+     32  e000
+     33  e000							;;;;; CPU VECTORS
+     34  12000 ????				       seg	VECTORS
+     35  fffa					      org	$0fffa
+     36  fffa					      rorg	$fffa	; start at address $fffa
+     37  fffa		       5b 80		      .word.w	nmi_handler	; $fffa vblank nmi
+     38  fffc		       00 80		      .word.w	cart_start	; $fffc reset
+     39  fffe		       5b 80		      .word.w	nmi_handler	; $fffe irq / brk
+     40  10000
+     41  10000
+     42  10000							;;;;; GRAPHX
+     43  10000				    grfx_offset EQM	$10000
+     44  10000
+     45  10000					       org	$0000+grfx_offset
+     46  10000					       incbin	"./assets/ascii.chr"
+     47  11000					       incbin	"./assets/ascii.chr"
+     48  12000
+     49  12000							;	org $3fff+grfx_offset
+     50  12000							;	byte 0
+     51  12000
