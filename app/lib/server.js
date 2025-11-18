@@ -2,7 +2,7 @@ let fs = require('fs');
 let http = require('http');
 let url = require('url');
 
-const root = '../../';
+const root = '../';
 let server;
 
 
@@ -23,6 +23,7 @@ const file_serve = (file, res) => {
 		if (file.includes('.jpeg')) mime = {'Content-Type': 'image/jpeg;'};
 		if (file.includes('.png')) mime = {'Content-Type': 'image/png;'};
 		// text types
+		if (file.includes('.css')) mime = {'Content-Type': 'text/css; charset=utf-8;'};
 		if (file.includes('.htm')) mime = {'Content-Type': 'text/html; charset=utf-8;'};
 		if (file.includes('.html')) mime = {'Content-Type': 'text/html; charset=utf-8;'};
 		if (file.includes('.js')) mime = {'Content-Type': '; charet=utf-8;'};
@@ -38,19 +39,22 @@ const file_serve = (file, res) => {
 
 
 const route = (path, res) => {
+	let file = '';
 	if (path[0] == '') {
-		file_serve(root + 'www/index.html', res);
+		file = root + 'www/index.html';
 	}
 	else if (path[0] == 'util') {
-		file_serve(root + 'util/' + path.slice(1).join('/'), res);
+		file = root + 'util/' + path.slice(1).join('/');
 	}
-	else file_serve(root + 'www/' + path.slice(1).join('/'), res);
+	else file = root + 'www/' + path.join('/');
+	console.log('route: ' + file);
+	file_serve(file, res);
 };
 
 
 exports.start = (port_id) => {
 	server = http.createServer(function(req, res) {
-		console.log('http access: ' + req.url);
+		console.log('request: ' + req.url);
 		const request = url.parse(req.url, true);
 		if (!request.pathname) res.writeHead(500).end();
 		let uri;
