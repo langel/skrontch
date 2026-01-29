@@ -1,17 +1,10 @@
  #include "cursor_manager.h"
  
- #include <SDL.h>
+#include <SDL.h>
+#include <SDL_image.h>
  #include <stddef.h>
  #include <stdio.h>
  
- typedef SDL_Surface *(*img_load_fn)(const char *path);
- typedef int (*img_init_fn)(int flags);
- typedef void (*img_quit_fn)(void);
- 
- static void *sdl_image_handle = NULL;
- static img_load_fn sdl_img_load = NULL;
- static img_init_fn sdl_img_init = NULL;
- static img_quit_fn sdl_img_quit = NULL;
  static int sdl_img_ready = 0;
  
  static int build_asset_path(char *buffer, size_t buffer_size, const char *filename)
@@ -28,47 +21,21 @@
  
  static SDL_Surface *load_surface_with_sdl_image(const char *path)
  {
-     if (sdl_img_load == NULL) {
-         const char *candidates[] = {
-             "SDL2_image.dll",
-             "libSDL2_image.so",
-             "libSDL2_image-2.0.so.0",
-             "libSDL2_image.dylib"
-         };
- 
-         for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
-             sdl_image_handle = SDL_LoadObject(candidates[i]);
-             if (sdl_image_handle != NULL) {
-                 sdl_img_load = (img_load_fn)SDL_LoadFunction(sdl_image_handle, "IMG_Load");
-                 sdl_img_init = (img_init_fn)SDL_LoadFunction(sdl_image_handle, "IMG_Init");
-                 sdl_img_quit = (img_quit_fn)SDL_LoadFunction(sdl_image_handle, "IMG_Quit");
-                 if (sdl_img_load != NULL) {
-                     break;
-                 }
-                 SDL_UnloadObject(sdl_image_handle);
-                 sdl_image_handle = NULL;
-                 sdl_img_load = NULL;
-                 sdl_img_init = NULL;
-                 sdl_img_quit = NULL;
-             }
-         }
-     }
- 
-     if (sdl_img_load == NULL) {
-         SDL_Log("cursor_manager: SDL2_image not available.");
-         return NULL;
-     }
- 
-     if (!sdl_img_ready && sdl_img_init != NULL) {
-         int init_flags = sdl_img_init(0x00000002);
-         if ((init_flags & 0x00000002) == 0) {
-             SDL_Log("cursor_manager: IMG_Init failed for PNG.");
-         } else {
-             sdl_img_ready = 1;
-         }
-     }
- 
-     return sdl_img_load(path);
+    if (!sdl_img_ready) {
+        int init_flags = IMG_Init(IMG_INIT_PNG);
+        if ((init_flags & IMG_INIT_PNG) == 0) {
+            SDL_Log("cursor_manager: IMG_Init failed for PNG: %s", IMG_GetError());
+        } else {
+            sdl_img_ready = 1;
+        }
+    }
+
+    if (!sdl_img_ready) {
+        SDL_Log("cursor_manager: SDL2_image not available.");
+        return NULL;
+    }
+
+    return IMG_Load(path);
  }
  
  static int load_cursor_texture(SDL_Renderer *renderer, const char *path, int hot_x, int hot_y,
@@ -257,17 +224,10 @@
          manager->cursor_size_ns = NULL;
      }
  
-     if (sdl_image_handle != NULL) {
-         if (sdl_img_quit != NULL) {
-             sdl_img_quit();
-         }
-         SDL_UnloadObject(sdl_image_handle);
-         sdl_image_handle = NULL;
-         sdl_img_load = NULL;
-         sdl_img_init = NULL;
-         sdl_img_quit = NULL;
-         sdl_img_ready = 0;
-     }
+    if (sdl_img_ready) {
+        IMG_Quit();
+        sdl_img_ready = 0;
+    }
  }
  
  void cursor_manager_set_mouse_inside(cursor_manager_t *manager, int inside)
