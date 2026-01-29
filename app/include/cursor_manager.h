@@ -7,8 +7,9 @@
      CURSOR_KIND_POINTER = 0,
      CURSOR_KIND_HAND_OPEN = 1,
      CURSOR_KIND_HAND_CLOSED = 2,
-     CURSOR_KIND_RESIZE_WE = 3,
-     CURSOR_KIND_RESIZE_NS = 4
+    CURSOR_KIND_HAND_ONE_FINGER = 3,
+    CURSOR_KIND_RESIZE_WE = 4,
+    CURSOR_KIND_RESIZE_NS = 5
  } cursor_kind_t;
  
  typedef struct custom_cursor_t {
@@ -29,6 +30,7 @@
      custom_cursor_t cursor_pointer;
      custom_cursor_t cursor_hand_open;
      custom_cursor_t cursor_hand_closed;
+    custom_cursor_t cursor_hand_one_finger;
      custom_cursor_t cursor_resize_we;
      custom_cursor_t cursor_resize_ns;
      SDL_Cursor *cursor_arrow;

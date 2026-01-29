@@ -5,6 +5,12 @@
  
 enum {
     HEADER_HEIGHT = 28,
+    MENU_HEIGHT = 26,
+    MENU_BUTTON_SIZE = 18,
+    MENU_BUTTON_PADDING = 6,
+    MENU_BORDER_THICKNESS = 2,
+    HEADER_BUTTON_SIZE = 14,
+    HEADER_BUTTON_PADDING = 6,
     SPLIT_THICKNESS = 12,
     MIN_PANE_SIZE = 120,
     DROP_ZONE_MARGIN_DIVISOR = 4
@@ -24,8 +30,12 @@ enum {
     manager->dragged_pane_node = -1;
     manager->dragged_split_node = -1;
     manager->focused_pane_node = -1;
+    manager->is_creating_pane = 0;
+    manager->pending_pane_id = 0;
     manager->hover_pane_index = -1;
     manager->hover_header = 0;
+    manager->hover_header_close = 0;
+    manager->hover_menu_button = 0;
     manager->hover_split_node = -1;
     manager->hover_drop_zone = DROP_ZONE_NONE;
     manager->esc_cancel_active = 0;
@@ -87,6 +97,54 @@ static int point_in_rect(int x, int y, const SDL_Rect *rect)
            y < rect->y + rect->h;
 }
 
+static int get_next_pane_id(window_manager_t *manager)
+{
+    int max_id = 0;
+    if (manager == NULL) {
+        return 1;
+    }
+
+    for (int i = 0; i < manager->node_count; ++i) {
+        if (manager->nodes[i].is_leaf && manager->nodes[i].pane_id > max_id) {
+            max_id = manager->nodes[i].pane_id;
+        }
+    }
+
+    return max_id + 1;
+}
+
+static SDL_Rect get_menu_bar_rect(window_manager_t *manager)
+{
+    int width = manager != NULL ? manager->width : 0;
+    return make_rect(0, 0, width, MENU_HEIGHT);
+}
+
+static SDL_Rect get_menu_close_rect(window_manager_t *manager)
+{
+    int width = manager != NULL ? manager->width : 0;
+    int x = width - MENU_BUTTON_PADDING - MENU_BUTTON_SIZE;
+    int y = (MENU_HEIGHT - MENU_BUTTON_SIZE) / 2;
+    return make_rect(x, y, MENU_BUTTON_SIZE, MENU_BUTTON_SIZE);
+}
+
+static SDL_Rect get_menu_add_rect(window_manager_t *manager)
+{
+    int width = manager != NULL ? manager->width : 0;
+    int x = width - MENU_BUTTON_PADDING * 2 - MENU_BUTTON_SIZE * 2;
+    int y = (MENU_HEIGHT - MENU_BUTTON_SIZE) / 2;
+    return make_rect(x, y, MENU_BUTTON_SIZE, MENU_BUTTON_SIZE);
+}
+
+static SDL_Rect get_header_close_rect(const SDL_Rect *header_rect)
+{
+    if (header_rect == NULL) {
+        return make_rect(0, 0, 0, 0);
+    }
+    int x = header_rect->x + header_rect->w - HEADER_BUTTON_PADDING - HEADER_BUTTON_SIZE;
+    int y = header_rect->y + (HEADER_HEIGHT - HEADER_BUTTON_SIZE) / 2;
+    return make_rect(x, y, HEADER_BUTTON_SIZE, HEADER_BUTTON_SIZE);
+}
+
 static void draw_border(SDL_Renderer *renderer, const SDL_Rect *rect, int thickness)
 {
     for (int i = 0; i < thickness; ++i) {
@@ -99,6 +157,38 @@ static void draw_border(SDL_Renderer *renderer, const SDL_Rect *rect, int thickn
         if (inset.w > 0 && inset.h > 0) {
             SDL_RenderDrawRect(renderer, &inset);
         }
+    }
+}
+
+static void draw_x_icon(SDL_Renderer *renderer, const SDL_Rect *rect, int thickness)
+{
+    if (renderer == NULL || rect == NULL) {
+        return;
+    }
+
+    int x0 = rect->x + 2;
+    int y0 = rect->y + 2;
+    int x1 = rect->x + rect->w - 3;
+    int y1 = rect->y + rect->h - 3;
+    for (int i = 0; i < thickness; ++i) {
+        SDL_RenderDrawLine(renderer, x0, y0 + i, x1, y1 + i);
+        SDL_RenderDrawLine(renderer, x0, y1 - i, x1, y0 - i);
+    }
+}
+
+static void draw_plus_icon(SDL_Renderer *renderer, const SDL_Rect *rect, int thickness)
+{
+    if (renderer == NULL || rect == NULL) {
+        return;
+    }
+
+    int mid_x = rect->x + rect->w / 2;
+    int mid_y = rect->y + rect->h / 2;
+    int half = rect->w < rect->h ? rect->w / 2 : rect->h / 2;
+    int length = half - 2;
+    for (int i = 0; i < thickness; ++i) {
+        SDL_RenderDrawLine(renderer, mid_x - length, mid_y + i, mid_x + length, mid_y + i);
+        SDL_RenderDrawLine(renderer, mid_x + i, mid_y - length, mid_x + i, mid_y + length);
     }
 }
 
@@ -220,6 +310,46 @@ static void split_tree_detach_leaf(window_manager_t *manager, int leaf_index)
     }
 }
 
+static int split_tree_insert_new_pane(window_manager_t *manager, int target_node,
+    int new_pane_id, drop_zone_t zone, const SDL_Rect *target_rect)
+{
+    if (manager == NULL || target_node < 0 || zone == DROP_ZONE_NONE) {
+        return -1;
+    }
+
+    drop_zone_t effective_zone = zone;
+    if (zone == DROP_ZONE_CENTER && target_rect != NULL) {
+        effective_zone = (target_rect->w >= target_rect->h) ? DROP_ZONE_RIGHT : DROP_ZONE_BOTTOM;
+    }
+
+    int existing_leaf = split_tree_add_leaf(manager, manager->nodes[target_node].pane_id);
+    int new_leaf = split_tree_add_leaf(manager, new_pane_id);
+    if (existing_leaf < 0 || new_leaf < 0) {
+        SDL_Log("split_tree_insert_new_pane: node limit reached");
+        return -1;
+    }
+
+    split_node_t *target = &manager->nodes[target_node];
+    target->is_leaf = 0;
+    target->pane_id = 0;
+    target->ratio = 0.5f;
+    target->orientation = (effective_zone == DROP_ZONE_LEFT || effective_zone == DROP_ZONE_RIGHT)
+        ? SPLIT_ORIENTATION_VERTICAL
+        : SPLIT_ORIENTATION_HORIZONTAL;
+
+    if (effective_zone == DROP_ZONE_LEFT || effective_zone == DROP_ZONE_TOP) {
+        target->first = new_leaf;
+        target->second = existing_leaf;
+    } else {
+        target->first = existing_leaf;
+        target->second = new_leaf;
+    }
+
+    manager->nodes[target->first].parent = target_node;
+    manager->nodes[target->second].parent = target_node;
+    return new_leaf;
+}
+
 static void split_tree_layout_node(window_manager_t *manager, int node_index, SDL_Rect rect,
     int depth, leaf_info_t *leaves, int *leaf_count, split_bar_t *bars, int *bar_count)
 {
@@ -325,7 +455,12 @@ static int split_tree_layout(window_manager_t *manager, leaf_info_t *leaves, int
 
     *leaf_count = 0;
     *bar_count = 0;
-    SDL_Rect root_rect = make_rect(0, 0, manager->width, manager->height);
+    int content_height = manager->height - MENU_HEIGHT - MENU_BORDER_THICKNESS;
+    if (content_height < 0) {
+        content_height = 0;
+    }
+    SDL_Rect root_rect = make_rect(0, MENU_HEIGHT + MENU_BORDER_THICKNESS,
+        manager->width, content_height);
     split_tree_layout_node(manager, manager->root_node, root_rect, 0,
         leaves, leaf_count, bars, bar_count);
     return 1;
@@ -390,6 +525,42 @@ static void sort_leaves_by_position(leaf_info_t *leaves, int leaf_count)
 
 static void window_manager_update_cursor(window_manager_t *manager);
 
+static void draw_split_bar(SDL_Renderer *renderer, const split_bar_t *bar, int is_hovered)
+{
+    SDL_Color fill_color = palette_get_color("gray2");
+    SDL_Color border_color = palette_get_color("black");
+
+    if (is_hovered) {
+        fill_color = palette_get_color("white");
+        border_color = palette_get_color("gray2");
+    }
+
+    SDL_SetRenderDrawColor(renderer, fill_color.r, fill_color.g, fill_color.b, fill_color.a);
+    SDL_RenderFillRect(renderer, &bar->rect);
+    SDL_SetRenderDrawColor(renderer, border_color.r, border_color.g, border_color.b, border_color.a);
+    if (bar->orientation == SPLIT_ORIENTATION_VERTICAL) {
+        SDL_Rect left_edge = make_rect(bar->rect.x, bar->rect.y, 2, bar->rect.h);
+        SDL_Rect right_edge = make_rect(
+            bar->rect.x + bar->rect.w - 2,
+            bar->rect.y,
+            2,
+            bar->rect.h
+        );
+        SDL_RenderFillRect(renderer, &left_edge);
+        SDL_RenderFillRect(renderer, &right_edge);
+    } else if (bar->orientation == SPLIT_ORIENTATION_HORIZONTAL) {
+        SDL_Rect top_edge = make_rect(bar->rect.x, bar->rect.y, bar->rect.w, 2);
+        SDL_Rect bottom_edge = make_rect(
+            bar->rect.x,
+            bar->rect.y + bar->rect.h - 2,
+            bar->rect.w,
+            2
+        );
+        SDL_RenderFillRect(renderer, &top_edge);
+        SDL_RenderFillRect(renderer, &bottom_edge);
+    }
+}
+
 static void window_manager_handle_mouse_down(window_manager_t *manager, int mouse_x, int mouse_y)
 {
     leaf_info_t leaves[MAX_SPLIT_NODES];
@@ -401,6 +572,48 @@ static void window_manager_handle_mouse_down(window_manager_t *manager, int mous
     manager->mouse_x = mouse_x;
     manager->mouse_y = mouse_y;
     cursor_manager_set_mouse_position(&manager->cursor_manager, mouse_x, mouse_y);
+
+    SDL_Rect menu_rect = get_menu_bar_rect(manager);
+    SDL_Rect menu_close = get_menu_close_rect(manager);
+    SDL_Rect menu_add = get_menu_add_rect(manager);
+    if (point_in_rect(mouse_x, mouse_y, &menu_rect)) {
+        if (point_in_rect(mouse_x, mouse_y, &menu_close)) {
+            manager->is_running = 0;
+        } else if (point_in_rect(mouse_x, mouse_y, &menu_add)) {
+            manager->is_creating_pane = 1;
+            manager->pending_pane_id = get_next_pane_id(manager);
+            manager->esc_cancel_active = 0;
+            manager->hover_drop_zone = DROP_ZONE_NONE;
+            manager->is_dragging_header = 0;
+            manager->is_dragging_split = 0;
+            manager->dragged_pane_node = -1;
+            manager->dragged_split_node = -1;
+        }
+        window_manager_update_cursor(manager);
+        return;
+    }
+
+    if (manager->is_creating_pane) {
+        int leaf_index = hit_test_leaf(mouse_x, mouse_y, leaves, leaf_count);
+        if (leaf_index >= 0) {
+            drop_zone_t drop_zone = compute_drop_zone(&leaves[leaf_index].rect, mouse_x, mouse_y);
+            int new_leaf = split_tree_insert_new_pane(
+                manager,
+                leaves[leaf_index].node_index,
+                manager->pending_pane_id,
+                drop_zone,
+                &leaves[leaf_index].rect
+            );
+            if (new_leaf >= 0) {
+                manager->focused_pane_node = new_leaf;
+                manager->is_creating_pane = 0;
+                manager->pending_pane_id = 0;
+                manager->hover_drop_zone = DROP_ZONE_NONE;
+            }
+        }
+        window_manager_update_cursor(manager);
+        return;
+    }
 
     int bar_index = hit_test_split_bar(mouse_x, mouse_y, bars, bar_count);
     if (bar_index >= 0) {
@@ -420,6 +633,22 @@ static void window_manager_handle_mouse_down(window_manager_t *manager, int mous
             leaves[leaf_index].rect.w,
             HEADER_HEIGHT
         );
+        SDL_Rect close_rect = get_header_close_rect(&header_rect);
+        if (header_rect.w >= HEADER_BUTTON_SIZE + HEADER_BUTTON_PADDING * 2 &&
+            point_in_rect(mouse_x, mouse_y, &close_rect)) {
+            if (leaf_count > 1) {
+                int closed_node = leaves[leaf_index].node_index;
+                split_tree_detach_leaf(manager, closed_node);
+                split_tree_layout(manager, leaves, &leaf_count, bars, &bar_count);
+                if (leaf_count > 0) {
+                    manager->focused_pane_node = leaves[0].node_index;
+                } else {
+                    manager->focused_pane_node = -1;
+                }
+            }
+            window_manager_update_cursor(manager);
+            return;
+        }
         if (point_in_rect(mouse_x, mouse_y, &header_rect)) {
             manager->is_dragging_header = 1;
             manager->dragged_pane_node = leaves[leaf_index].node_index;
@@ -437,7 +666,9 @@ static void window_manager_update_cursor(window_manager_t *manager)
 {
     cursor_kind_t kind = CURSOR_KIND_POINTER;
 
-    if (manager->is_dragging_header) {
+    if (manager->is_creating_pane) {
+        kind = CURSOR_KIND_HAND_CLOSED;
+    } else if (manager->is_dragging_header) {
         kind = CURSOR_KIND_HAND_CLOSED;
     } else if (manager->is_dragging_split || manager->hover_split_node >= 0) {
         split_orientation_t orientation = manager->nodes[
@@ -446,6 +677,8 @@ static void window_manager_update_cursor(window_manager_t *manager)
         kind = (orientation == SPLIT_ORIENTATION_VERTICAL)
             ? CURSOR_KIND_RESIZE_WE
             : CURSOR_KIND_RESIZE_NS;
+    } else if (manager->hover_menu_button || manager->hover_header_close) {
+        kind = CURSOR_KIND_HAND_ONE_FINGER;
     } else if (manager->hover_header) {
         kind = CURSOR_KIND_HAND_OPEN;
     }
@@ -587,6 +820,8 @@ static void window_manager_update_cursor(window_manager_t *manager)
         }
         if (event->window.event == SDL_WINDOWEVENT_LEAVE) {
             manager->hover_header = 0;
+            manager->hover_header_close = 0;
+            manager->hover_menu_button = 0;
             manager->hover_split_node = -1;
             manager->hover_drop_zone = DROP_ZONE_NONE;
             cursor_manager_set_mouse_inside(&manager->cursor_manager, 0);
@@ -691,11 +926,22 @@ static void window_manager_update_cursor(window_manager_t *manager)
         manager->hover_pane_index = hit_test_leaf(mouse_x, mouse_y, leaves, leaf_count);
         manager->hover_split_node = -1;
         manager->hover_header = 0;
+        manager->hover_header_close = 0;
+        manager->hover_menu_button = 0;
         manager->hover_drop_zone = DROP_ZONE_NONE;
 
         int bar_index = hit_test_split_bar(mouse_x, mouse_y, bars, bar_count);
         if (bar_index >= 0) {
             manager->hover_split_node = bars[bar_index].node_index;
+        }
+
+        SDL_Rect menu_rect = get_menu_bar_rect(manager);
+        SDL_Rect menu_close = get_menu_close_rect(manager);
+        SDL_Rect menu_add = get_menu_add_rect(manager);
+        if (point_in_rect(mouse_x, mouse_y, &menu_rect) &&
+            (point_in_rect(mouse_x, mouse_y, &menu_close) ||
+             point_in_rect(mouse_x, mouse_y, &menu_add))) {
+            manager->hover_menu_button = 1;
         }
 
         if (manager->hover_pane_index >= 0) {
@@ -705,11 +951,18 @@ static void window_manager_update_cursor(window_manager_t *manager)
                 leaves[manager->hover_pane_index].rect.w,
                 HEADER_HEIGHT
             );
+            SDL_Rect close_rect = get_header_close_rect(&header_rect);
             if (point_in_rect(mouse_x, mouse_y, &header_rect)) {
-                manager->hover_header = 1;
+                if (header_rect.w >= HEADER_BUTTON_SIZE + HEADER_BUTTON_PADDING * 2 &&
+                    point_in_rect(mouse_x, mouse_y, &close_rect)) {
+                    manager->hover_header_close = 1;
+                } else {
+                    manager->hover_header = 1;
+                }
             }
 
-            if (manager->is_dragging_header && !manager->esc_cancel_active) {
+            if ((manager->is_dragging_header || manager->is_creating_pane) &&
+                !manager->esc_cancel_active) {
                 manager->hover_drop_zone = compute_drop_zone(
                     &leaves[manager->hover_pane_index].rect,
                     mouse_x,
@@ -747,6 +1000,8 @@ static void window_manager_update_cursor(window_manager_t *manager)
         if (event->key.keysym.sym == SDLK_ESCAPE) {
             manager->esc_cancel_active = 1;
             manager->hover_drop_zone = DROP_ZONE_NONE;
+            manager->is_creating_pane = 0;
+            manager->pending_pane_id = 0;
         }
         if (event->key.keysym.sym == SDLK_TAB &&
             (event->key.keysym.mod & KMOD_CTRL) != 0) {
@@ -844,6 +1099,13 @@ static void window_manager_update_cursor(window_manager_t *manager)
         SDL_SetRenderDrawColor(manager->renderer, header_color.r, header_color.g, header_color.b, header_color.a);
         SDL_RenderFillRect(manager->renderer, &header_rect);
 
+        if (header_rect.w >= HEADER_BUTTON_SIZE + HEADER_BUTTON_PADDING * 2) {
+            SDL_Rect close_rect = get_header_close_rect(&header_rect);
+            SDL_Color icon_color = palette_get_color("white");
+            SDL_SetRenderDrawColor(manager->renderer, icon_color.r, icon_color.g, icon_color.b, icon_color.a);
+            draw_x_icon(manager->renderer, &close_rect, 2);
+        }
+
         if (pane_id > 0) {
             int min_dim = leaves[i].rect.w < leaves[i].rect.h ? leaves[i].rect.w : leaves[i].rect.h;
             int digit_size = min_dim / 3;
@@ -885,38 +1147,11 @@ static void window_manager_update_cursor(window_manager_t *manager)
         if (bars[i].node_index == manager->hover_split_node) {
             continue;
         }
-
-        SDL_Color fill_color = palette_get_color("gray2");
-        SDL_Color border_color = palette_get_color("black");
-
-        SDL_SetRenderDrawColor(manager->renderer, fill_color.r, fill_color.g, fill_color.b, fill_color.a);
-        SDL_RenderFillRect(manager->renderer, &bars[i].rect);
-        SDL_SetRenderDrawColor(manager->renderer, border_color.r, border_color.g, border_color.b, border_color.a);
-        if (bars[i].orientation == SPLIT_ORIENTATION_VERTICAL) {
-            SDL_Rect left_edge = make_rect(bars[i].rect.x, bars[i].rect.y, 2, bars[i].rect.h);
-            SDL_Rect right_edge = make_rect(
-                bars[i].rect.x + bars[i].rect.w - 2,
-                bars[i].rect.y,
-                2,
-                bars[i].rect.h
-            );
-            SDL_RenderFillRect(manager->renderer, &left_edge);
-            SDL_RenderFillRect(manager->renderer, &right_edge);
-        } else if (bars[i].orientation == SPLIT_ORIENTATION_HORIZONTAL) {
-            SDL_Rect top_edge = make_rect(bars[i].rect.x, bars[i].rect.y, bars[i].rect.w, 2);
-            SDL_Rect bottom_edge = make_rect(
-                bars[i].rect.x,
-                bars[i].rect.y + bars[i].rect.h - 2,
-                bars[i].rect.w,
-                2
-            );
-            SDL_RenderFillRect(manager->renderer, &top_edge);
-            SDL_RenderFillRect(manager->renderer, &bottom_edge);
-        }
+        draw_split_bar(manager->renderer, &bars[i], 0);
     }
 
     if (has_focus_rect) {
-        SDL_Color focus_color = palette_get_color("white");
+        SDL_Color focus_color = palette_get_color("gray1");
         SDL_SetRenderDrawColor(manager->renderer, focus_color.r, focus_color.g, focus_color.b, focus_color.a);
         draw_border(manager->renderer, &focus_rect, 4);
     }
@@ -925,42 +1160,16 @@ static void window_manager_update_cursor(window_manager_t *manager)
         if (bars[i].node_index != manager->hover_split_node) {
             continue;
         }
-
-        SDL_Color fill_color = palette_get_color("white");
-        SDL_Color border_color = palette_get_color("gray2");
-
-        SDL_SetRenderDrawColor(manager->renderer, fill_color.r, fill_color.g, fill_color.b, fill_color.a);
-        SDL_RenderFillRect(manager->renderer, &bars[i].rect);
-        SDL_SetRenderDrawColor(manager->renderer, border_color.r, border_color.g, border_color.b, border_color.a);
-        if (bars[i].orientation == SPLIT_ORIENTATION_VERTICAL) {
-            SDL_Rect left_edge = make_rect(bars[i].rect.x, bars[i].rect.y, 2, bars[i].rect.h);
-            SDL_Rect right_edge = make_rect(
-                bars[i].rect.x + bars[i].rect.w - 2,
-                bars[i].rect.y,
-                2,
-                bars[i].rect.h
-            );
-            SDL_RenderFillRect(manager->renderer, &left_edge);
-            SDL_RenderFillRect(manager->renderer, &right_edge);
-        } else if (bars[i].orientation == SPLIT_ORIENTATION_HORIZONTAL) {
-            SDL_Rect top_edge = make_rect(bars[i].rect.x, bars[i].rect.y, bars[i].rect.w, 2);
-            SDL_Rect bottom_edge = make_rect(
-                bars[i].rect.x,
-                bars[i].rect.y + bars[i].rect.h - 2,
-                bars[i].rect.w,
-                2
-            );
-            SDL_RenderFillRect(manager->renderer, &top_edge);
-            SDL_RenderFillRect(manager->renderer, &bottom_edge);
-        }
+        draw_split_bar(manager->renderer, &bars[i], 1);
     }
 
-    if (manager->is_dragging_header &&
+    if ((manager->is_dragging_header || manager->is_creating_pane) &&
         !manager->esc_cancel_active &&
         manager->hover_pane_index >= 0 &&
         manager->hover_pane_index < leaf_count &&
         manager->hover_drop_zone != DROP_ZONE_NONE &&
-        leaves[manager->hover_pane_index].node_index != manager->dragged_pane_node) {
+        !(manager->is_dragging_header &&
+          leaves[manager->hover_pane_index].node_index == manager->dragged_pane_node)) {
         SDL_Rect target = leaves[manager->hover_pane_index].rect;
         int margin_x = target.w / DROP_ZONE_MARGIN_DIVISOR;
         int margin_y = target.h / DROP_ZONE_MARGIN_DIVISOR;
@@ -1018,6 +1227,44 @@ static void window_manager_update_cursor(window_manager_t *manager)
         SDL_SetRenderDrawColor(manager->renderer, drag_outline.r, drag_outline.g, drag_outline.b, drag_outline.a);
         draw_border(manager->renderer, &outline_rect, 2);
     }
+
+    if (manager->is_creating_pane) {
+        int preview_w = manager->width / 4;
+        int preview_h = manager->height / 4;
+        if (preview_w < 40) {
+            preview_w = 40;
+        }
+        if (preview_h < 40) {
+            preview_h = 40;
+        }
+        SDL_Rect preview_rect = make_rect(
+            manager->mouse_x - preview_w / 2,
+            manager->mouse_y - preview_h / 2,
+            preview_w,
+            preview_h
+        );
+        SDL_Color preview_color = palette_get_color("white");
+        SDL_SetRenderDrawColor(manager->renderer, preview_color.r, preview_color.g,
+            preview_color.b, preview_color.a);
+        draw_border(manager->renderer, &preview_rect, 2);
+    }
+
+    SDL_Rect menu_rect = get_menu_bar_rect(manager);
+    SDL_Color menu_color = palette_get_color("gray1");
+    SDL_SetRenderDrawColor(manager->renderer, menu_color.r, menu_color.g, menu_color.b, menu_color.a);
+    SDL_RenderFillRect(manager->renderer, &menu_rect);
+
+    SDL_Color border_color = palette_get_color("black");
+    SDL_SetRenderDrawColor(manager->renderer, border_color.r, border_color.g, border_color.b, border_color.a);
+    SDL_Rect menu_border = make_rect(0, MENU_HEIGHT, manager->width, MENU_BORDER_THICKNESS);
+    SDL_RenderFillRect(manager->renderer, &menu_border);
+
+    SDL_Color icon_color = palette_get_color("white");
+    SDL_SetRenderDrawColor(manager->renderer, icon_color.r, icon_color.g, icon_color.b, icon_color.a);
+    SDL_Rect menu_add = get_menu_add_rect(manager);
+    SDL_Rect menu_close = get_menu_close_rect(manager);
+    draw_plus_icon(manager->renderer, &menu_add, 2);
+    draw_x_icon(manager->renderer, &menu_close, 2);
 
     cursor_manager_render(&manager->cursor_manager);
  

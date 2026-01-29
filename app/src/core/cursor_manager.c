@@ -125,6 +125,11 @@
          case CURSOR_KIND_HAND_CLOSED:
              cursor = &manager->cursor_hand_closed;
              break;
+        case CURSOR_KIND_HAND_ONE_FINGER:
+            cursor = manager->cursor_hand_one_finger.texture != NULL
+                ? &manager->cursor_hand_one_finger
+                : &manager->cursor_hand_open;
+            break;
          case CURSOR_KIND_RESIZE_WE:
              cursor = manager->cursor_resize_we.texture != NULL
                  ? &manager->cursor_resize_we
@@ -155,6 +160,8 @@
          cursor = manager->cursor_hand;
      } else if (manager->active_kind == CURSOR_KIND_HAND_CLOSED) {
          cursor = manager->cursor_move;
+    } else if (manager->active_kind == CURSOR_KIND_HAND_ONE_FINGER) {
+        cursor = manager->cursor_hand;
      } else if (manager->active_kind == CURSOR_KIND_RESIZE_WE) {
          cursor = manager->cursor_size_we;
      } else if (manager->active_kind == CURSOR_KIND_RESIZE_NS) {
@@ -182,6 +189,7 @@
      manager->cursor_pointer.texture = NULL;
      manager->cursor_hand_open.texture = NULL;
      manager->cursor_hand_closed.texture = NULL;
+    manager->cursor_hand_one_finger.texture = NULL;
      manager->cursor_resize_we.texture = NULL;
      manager->cursor_resize_ns.texture = NULL;
  
@@ -195,6 +203,9 @@
          manager->custom_cursor_enabled = 1;
          SDL_ShowCursor(SDL_DISABLE);
      }
+    if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_hand_1_finger.png")) {
+        load_cursor_texture(renderer, cursor_path, 6, 2, &manager->cursor_hand_one_finger);
+    }
  
      if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_resize_we.png")) {
          load_cursor_texture(renderer, cursor_path, 8, 8, &manager->cursor_resize_we);
@@ -221,6 +232,7 @@
      destroy_cursor_texture(&manager->cursor_pointer);
      destroy_cursor_texture(&manager->cursor_hand_open);
      destroy_cursor_texture(&manager->cursor_hand_closed);
+    destroy_cursor_texture(&manager->cursor_hand_one_finger);
      destroy_cursor_texture(&manager->cursor_resize_we);
      destroy_cursor_texture(&manager->cursor_resize_ns);
  

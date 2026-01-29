@@ -46,8 +46,12 @@
      int dragged_pane_node;
      int dragged_split_node;
     int focused_pane_node;
+    int is_creating_pane;
+    int pending_pane_id;
      int hover_pane_index;
      int hover_header;
+    int hover_header_close;
+    int hover_menu_button;
      int hover_split_node;
      drop_zone_t hover_drop_zone;
     int esc_cancel_active;
