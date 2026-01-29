@@ -1,0 +1,81 @@
+# Skrontch Project Rules
+
+## Language & Framework
+- Use C (C99 standard) with SDL2
+- All code must compile with standard C compilers (gcc, clang, MSVC)
+- Use SDL2 for windowing, rendering, input, and audio
+
+## Naming Conventions
+- **ALL identifiers use snake_case**: functions, variables, structs, types, enums, constants
+- Struct names end with `_t` (e.g., `window_t`, `tab_container_t`)
+- Function names follow pattern: `module_action` (e.g., `window_create`, `tab_add`)
+- Constants use UPPER_SNAKE_CASE (e.g., `MAX_WINDOWS`, `DEFAULT_WIDTH`)
+- File names use snake_case (e.g., `window_manager.c`, `split_pane.h`)
+
+## Code Style
+- Use 4 spaces for indentation (no tabs)
+- Opening braces on same line for functions, new line for structs/enums
+- Maximum line length: 100 characters
+- Always initialize variables
+- Use `const` for parameters that shouldn't be modified
+- Prefer `size_t` for sizes and counts
+
+## Memory Management
+- Always check for NULL after malloc/calloc/realloc
+- Use consistent error handling pattern
+- Free resources in reverse order of allocation
+- Consider using a simple memory pool for frequent allocations
+
+## GUI System Architecture
+- **Windows**: Top-level containers that can be moved, resized, minimized
+- **Tabs**: Tab containers within windows, allowing multiple views
+- **Split Panes**: Resizable dividers that can split windows/tabs horizontally or vertically
+- Components are hierarchical: Window -> Tab -> Split Pane -> Content
+
+## Component Patterns
+- Each GUI component has: create, destroy, update, render, handle_event functions
+- Use function pointers for callbacks (e.g., `on_close_callback_t`)
+- Store component state in structs with clear ownership
+- Use opaque pointers (forward declarations) in headers when possible
+
+## Error Handling
+- Functions return error codes (0 = success, non-zero = error)
+- Use enum for error types: `typedef enum { SKRONTCH_OK, SKRONTCH_ERROR, ... } skrontch_error_t`
+- Log errors but don't crash - graceful degradation preferred
+
+## File Organization
+- One header (.h) and one source (.c) file per major component
+- Headers include only what's necessary (forward declarations when possible)
+- Group related functionality in modules (window/, tab/, split_pane/, etc.)
+
+## SDL-Specific
+- Always check SDL function return values
+- Use SDL_Rect for rectangles, SDL_Point for coordinates
+- Prefer SDL2 rendering over deprecated SDL1 functions
+- Use SDL_GetTicks64() for timing
+- Clean up SDL resources in reverse order of initialization
+
+## Testing & Debugging
+- Add debug logging that can be compiled out in release builds
+- Use assertions for invariants (can be disabled in release)
+- Test components in isolation before integration
+
+## Project Structure
+```
+skrontch/
+├── src/
+│   ├── core/          # Core systems (window manager, event loop)
+│   ├── gui/           # GUI components (windows, tabs, split panes)
+│   ├── tools/         # Tool implementations (graphics, sound)
+│   └── utils/         # Utility functions
+├── include/           # Public headers
+├── build/             # Build artifacts
+└── assets/            # Resources (icons, fonts, etc.)
+```
+
+## Implementation Guidelines
+- Start with core windowing system, then add tabs, then split panes
+- Build incrementally - each component should work before adding next
+- Keep functions focused and small (single responsibility)
+- Document complex algorithms and non-obvious code
+- Prefer composition over complex inheritance patterns

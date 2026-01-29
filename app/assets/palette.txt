@@ -1,0 +1,16 @@
+222323 black
+5f6162 gray1
+a4a9a5 gray2
+f0f6f0 white
+15de29 green2
+11d7f2 cyan
+fd1ff3 magenta
+ff9fcb pink
+1b9045 green1
+0b79ec blue
+ad2bbe purple
+cd0233 red
+e5802d orange
+ffd300 yellow
+653819 brown
+e0ac69 tan
