@@ -145,7 +145,7 @@ static SDL_Rect get_header_close_rect(const SDL_Rect *header_rect)
     return make_rect(x, y, HEADER_BUTTON_SIZE, HEADER_BUTTON_SIZE);
 }
 
-static void draw_border(SDL_Renderer *renderer, const SDL_Rect *rect, int thickness)
+static void draw_border_inside(SDL_Renderer *renderer, const SDL_Rect *rect, int thickness)
 {
     for (int i = 0; i < thickness; ++i) {
         SDL_Rect inset = {
@@ -153,6 +153,21 @@ static void draw_border(SDL_Renderer *renderer, const SDL_Rect *rect, int thickn
             rect->y + i,
             rect->w - i * 2,
             rect->h - i * 2
+        };
+        if (inset.w > 0 && inset.h > 0) {
+            SDL_RenderDrawRect(renderer, &inset);
+        }
+    }
+}
+
+static void draw_border_outside(SDL_Renderer *renderer, const SDL_Rect *rect, int thickness)
+{
+    for (int i = 1; i <= thickness; ++i) {
+        SDL_Rect inset = {
+            rect->x - i,
+            rect->y - i,
+            rect->w + i * 2,
+            rect->h + i * 2
         };
         if (inset.w > 0 && inset.h > 0) {
             SDL_RenderDrawRect(renderer, &inset);
@@ -862,6 +877,7 @@ static void window_manager_update_cursor(window_manager_t *manager)
                     int temp_id = manager->nodes[target_node].pane_id;
                     manager->nodes[target_node].pane_id = manager->nodes[dragged_node].pane_id;
                     manager->nodes[dragged_node].pane_id = temp_id;
+                    manager->focused_pane_node = target_node;
                 } else if (manager->hover_drop_zone != DROP_ZONE_NONE &&
                     target_node != dragged_node) {
                     int dragged_pane_id = manager->nodes[dragged_node].pane_id;
@@ -1135,10 +1151,6 @@ static void window_manager_update_cursor(window_manager_t *manager)
 
         if (leaves[i].node_index == manager->focused_pane_node) {
             focus_rect = leaves[i].rect;
-            focus_rect.x -= 4;
-            focus_rect.y -= 4;
-            focus_rect.w += 8;
-            focus_rect.h += 8;
             has_focus_rect = 1;
         }
      }
@@ -1153,7 +1165,7 @@ static void window_manager_update_cursor(window_manager_t *manager)
     if (has_focus_rect) {
         SDL_Color focus_color = palette_get_color("gray1");
         SDL_SetRenderDrawColor(manager->renderer, focus_color.r, focus_color.g, focus_color.b, focus_color.a);
-        draw_border(manager->renderer, &focus_rect, 4);
+        draw_border_outside(manager->renderer, &focus_rect, 4);
     }
 
     for (int i = 0; i < bar_count; ++i) {
@@ -1192,7 +1204,7 @@ static void window_manager_update_cursor(window_manager_t *manager)
             SDL_SetRenderDrawColor(manager->renderer, drop_color.r, drop_color.g, drop_color.b, 60);
             SDL_RenderFillRect(manager->renderer, &center_zone);
             SDL_SetRenderDrawColor(manager->renderer, drop_color.r, drop_color.g, drop_color.b, 200);
-            draw_border(manager->renderer, &center_zone, 2);
+            draw_border_inside(manager->renderer, &center_zone, 2);
         } else {
             SDL_Rect preview = target;
             if (manager->hover_drop_zone == DROP_ZONE_LEFT) {
@@ -1205,7 +1217,7 @@ static void window_manager_update_cursor(window_manager_t *manager)
                 preview = bottom_zone;
             }
             SDL_SetRenderDrawColor(manager->renderer, drop_color.r, drop_color.g, drop_color.b, 200);
-            draw_border(manager->renderer, &preview, 2);
+            draw_border_inside(manager->renderer, &preview, 2);
         }
 
         SDL_SetRenderDrawBlendMode(manager->renderer, SDL_BLENDMODE_NONE);
@@ -1225,7 +1237,7 @@ static void window_manager_update_cursor(window_manager_t *manager)
         SDL_Rect outline_rect = make_rect(outline_x, outline_y, dragged_pane.w, dragged_pane.h);
         SDL_Color drag_outline = palette_get_color("white");
         SDL_SetRenderDrawColor(manager->renderer, drag_outline.r, drag_outline.g, drag_outline.b, drag_outline.a);
-        draw_border(manager->renderer, &outline_rect, 2);
+        draw_border_inside(manager->renderer, &outline_rect, 2);
     }
 
     if (manager->is_creating_pane) {
@@ -1246,7 +1258,7 @@ static void window_manager_update_cursor(window_manager_t *manager)
         SDL_Color preview_color = palette_get_color("white");
         SDL_SetRenderDrawColor(manager->renderer, preview_color.r, preview_color.g,
             preview_color.b, preview_color.a);
-        draw_border(manager->renderer, &preview_rect, 2);
+        draw_border_inside(manager->renderer, &preview_rect, 2);
     }
 
     SDL_Rect menu_rect = get_menu_bar_rect(manager);
