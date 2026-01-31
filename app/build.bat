@@ -21,7 +21,7 @@
  )
  
 set CFLAGS=-std=c99 -Wall -Wextra -I"%INCLUDE_DIR%" -I"%SDL_INCLUDE%"
- set LDFLAGS=-L"%SDL_LIB%" -lmingw32 -lSDL2main -lSDL2 -lSDL_image
+set LDFLAGS=-L"%SDL_LIB%" -lmingw32 -lSDL2main -lSDL2
  
  set SOURCES=
  for /r "%SRC_DIR%" %%f in (*.c) do (
@@ -39,8 +39,5 @@ set CFLAGS=-std=c99 -Wall -Wextra -I"%INCLUDE_DIR%" -I"%SDL_INCLUDE%"
  if exist "%SDL_LIB%\SDL2.dll" (
      copy /Y "%SDL_LIB%\SDL2.dll" "%BUILD_DIR%\SDL2.dll" > nul
  )
-if exist "%SDL_LIB%\SDL2_image.dll" (
-    copy /Y "%SDL_LIB%\SDL2_image.dll" "%BUILD_DIR%\SDL2_image.dll" > nul
-)
  
  echo Build complete: %BUILD_DIR%\skrontch.exe

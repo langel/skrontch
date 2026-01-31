@@ -1,75 +1,127 @@
  #include "cursor_manager.h"
  
 #include <SDL.h>
-#include <SDL_image.h>
- #include <stddef.h>
- #include <stdio.h>
- 
- static int sdl_img_ready = 0;
+#include <stddef.h>
+#include <stdio.h>
+#include <string.h>
+
+#include "image_loader.h"
  
  static int build_asset_path(char *buffer, size_t buffer_size, const char *filename)
  {
      char *base_path = SDL_GetBasePath();
      const char *fallback = ".";
-     const char *root = base_path != NULL ? base_path : fallback;
-     int wrote = snprintf(buffer, buffer_size, "%s../assets/%s", root, filename);
+    const char *root = base_path != NULL ? base_path : fallback;
+#ifdef _WIN32
+    const char separator = '\\';
+#else
+    const char separator = '/';
+#endif
+    char root_buffer[512];
+    snprintf(root_buffer, sizeof(root_buffer), "%s", root);
+
+    size_t length = strlen(root_buffer);
+    while (length > 0 &&
+        (root_buffer[length - 1] == '/' || root_buffer[length - 1] == '\\')) {
+        root_buffer[length - 1] = '\0';
+        length--;
+    }
+
+    if (length >= 5) {
+        const char *tail = root_buffer + length - 5;
+        if (strcmp(tail, "build") == 0) {
+            root_buffer[length - 5] = '\0';
+            length -= 5;
+            while (length > 0 &&
+                (root_buffer[length - 1] == '/' || root_buffer[length - 1] == '\\')) {
+                root_buffer[length - 1] = '\0';
+                length--;
+            }
+        }
+    }
+
+    int wrote = snprintf(buffer, buffer_size, "%s%cassets%c%s",
+        root_buffer, separator, separator, filename);
      if (base_path != NULL) {
          SDL_free(base_path);
      }
      return wrote > 0 && (size_t)wrote < buffer_size;
  }
  
- static SDL_Surface *load_surface_with_sdl_image(const char *path)
- {
-    if (!sdl_img_ready) {
-        int init_flags = IMG_Init(IMG_INIT_PNG);
-        if ((init_flags & IMG_INIT_PNG) == 0) {
-            SDL_Log("cursor_manager: IMG_Init failed for PNG: %s", IMG_GetError());
-        } else {
-            sdl_img_ready = 1;
-        }
+static SDL_Surface *load_surface_for_cursor(const char *path)
+{
+    const char *ext = strrchr(path, '.');
+    if (ext == NULL) {
+        return image_loader_load_rgba(path);
     }
 
-    if (!sdl_img_ready) {
-        SDL_Log("cursor_manager: SDL2_image not available.");
+    if (strcmp(ext, ".png") == 0 || strcmp(ext, ".jpg") == 0 ||
+        strcmp(ext, ".jpeg") == 0 || strcmp(ext, ".bmp") == 0) {
+        SDL_Log("cursor_manager: loading image %s", path);
+        return image_loader_load_rgba(path);
+    }
+
+    SDL_Log("cursor_manager: unsupported image extension %s", path);
+    return NULL;
+}
+
+static int load_cursor_texture(SDL_Renderer *renderer, const char *path, int hot_x, int hot_y,
+    custom_cursor_t *cursor)
+{
+    SDL_Log("cursor_manager: load_cursor_texture %s", path);
+    SDL_Surface *surface = load_surface_for_cursor(path);
+    if (surface == NULL) {
+        SDL_Log("cursor_manager: failed to load %s", path);
+        return 0;
+    }
+
+    SDL_Log("cursor_manager: CreateTexture %s", path);
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
+    if (texture == NULL) {
+        SDL_Log("cursor_manager: SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
+        SDL_FreeSurface(surface);
+        return 0;
+    }
+
+    SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
+
+    cursor->texture = texture;
+    cursor->width = surface->w;
+    cursor->height = surface->h;
+    cursor->hot_x = hot_x;
+    cursor->hot_y = hot_y;
+
+    SDL_FreeSurface(surface);
+    return 1;
+}
+
+static SDL_Cursor *load_color_cursor(const char *path, int hot_x, int hot_y)
+{
+    SDL_Log("cursor_manager: load_color_cursor %s", path);
+    SDL_Surface *surface = load_surface_for_cursor(path);
+    if (surface == NULL) {
+        SDL_Log("cursor_manager: failed to load %s", path);
         return NULL;
     }
 
-    return IMG_Load(path);
- }
+    SDL_Cursor *cursor = SDL_CreateColorCursor(surface, hot_x, hot_y);
+    SDL_FreeSurface(surface);
+    if (cursor == NULL) {
+        SDL_Log("cursor_manager: SDL_CreateColorCursor failed: %s", SDL_GetError());
+    }
+    return cursor;
+}
  
- static int load_cursor_texture(SDL_Renderer *renderer, const char *path, int hot_x, int hot_y,
-     custom_cursor_t *cursor)
- {
-     SDL_Surface *surface = load_surface_with_sdl_image(path);
-     if (surface == NULL) {
-         surface = SDL_LoadBMP(path);
-     }
- 
-     if (surface == NULL) {
-         SDL_Log("cursor_manager: failed to load %s", path);
-         return 0;
-     }
- 
-     SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, surface);
-     if (texture == NULL) {
-         SDL_Log("cursor_manager: SDL_CreateTextureFromSurface failed: %s", SDL_GetError());
-         SDL_FreeSurface(surface);
-         return 0;
-     }
- 
-     SDL_SetTextureScaleMode(texture, SDL_ScaleModeNearest);
- 
-     cursor->texture = texture;
-     cursor->width = surface->w;
-     cursor->height = surface->h;
-     cursor->hot_x = hot_x;
-     cursor->hot_y = hot_y;
- 
-     SDL_FreeSurface(surface);
-     return 1;
- }
- 
+static int file_exists(const char *path)
+{
+    SDL_RWops *file = SDL_RWFromFile(path, "rb");
+    if (file == NULL) {
+        return 0;
+    }
+    SDL_RWclose(file);
+    return 1;
+}
+
  static void destroy_cursor_texture(custom_cursor_t *cursor)
  {
      if (cursor->texture != NULL) {
@@ -160,34 +212,49 @@
      manager->cursor_resize_we.texture = NULL;
      manager->cursor_resize_ns.texture = NULL;
  
-     char cursor_path[512];
-     if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_pointer.png") &&
-         load_cursor_texture(renderer, cursor_path, 0, 0, &manager->cursor_pointer) &&
-         build_asset_path(cursor_path, sizeof(cursor_path), "cursor_hand_open.png") &&
-         load_cursor_texture(renderer, cursor_path, 6, 2, &manager->cursor_hand_open) &&
-         build_asset_path(cursor_path, sizeof(cursor_path), "cursor_hand_closed.png") &&
-         load_cursor_texture(renderer, cursor_path, 6, 2, &manager->cursor_hand_closed)) {
-         manager->custom_cursor_enabled = 1;
-         SDL_ShowCursor(SDL_DISABLE);
-     }
-    if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_hand_1_finger.png")) {
-        load_cursor_texture(renderer, cursor_path, 6, 2, &manager->cursor_hand_one_finger);
+    SDL_Log("cursor_manager_init start");
+    if (renderer == NULL) {
+        SDL_Log("cursor_manager_init: renderer is NULL, skipping custom cursors");
+        return;
     }
- 
-     if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_resize_we.png")) {
-         load_cursor_texture(renderer, cursor_path, 8, 8, &manager->cursor_resize_we);
-     }
-     if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_resize_ns.png")) {
-         load_cursor_texture(renderer, cursor_path, 8, 8, &manager->cursor_resize_ns);
-     }
- 
+
      manager->cursor_arrow = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_ARROW);
      manager->cursor_hand = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_HAND);
      manager->cursor_move = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
      manager->cursor_size_we = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
      manager->cursor_size_ns = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
  
-     update_system_cursor(manager);
+    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
+
+    char cursor_path[512];
+    if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_pointer.png") &&
+        file_exists(cursor_path) &&
+        load_cursor_texture(renderer, cursor_path, 0, 0, &manager->cursor_pointer) &&
+        build_asset_path(cursor_path, sizeof(cursor_path), "cursor_hand_open.png") &&
+        file_exists(cursor_path) &&
+        load_cursor_texture(renderer, cursor_path, 6, 2, &manager->cursor_hand_open) &&
+        build_asset_path(cursor_path, sizeof(cursor_path), "cursor_hand_closed.png") &&
+        file_exists(cursor_path) &&
+        load_cursor_texture(renderer, cursor_path, 6, 2, &manager->cursor_hand_closed)) {
+        manager->custom_cursor_enabled = 1;
+        SDL_ShowCursor(SDL_DISABLE);
+    }
+    if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_hand_1_finger.png") &&
+        file_exists(cursor_path)) {
+        load_cursor_texture(renderer, cursor_path, 6, 2, &manager->cursor_hand_one_finger);
+    }
+
+    if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_resize_we.png") &&
+        file_exists(cursor_path)) {
+        load_cursor_texture(renderer, cursor_path, 8, 8, &manager->cursor_resize_we);
+    }
+    if (build_asset_path(cursor_path, sizeof(cursor_path), "cursor_resize_ns.png") &&
+        file_exists(cursor_path)) {
+        load_cursor_texture(renderer, cursor_path, 8, 8, &manager->cursor_resize_ns);
+    }
+
+    update_system_cursor(manager);
+    SDL_Log("cursor_manager_init done (custom=%d)", manager->custom_cursor_enabled);
  }
  
  void cursor_manager_shutdown(cursor_manager_t *manager)
@@ -224,10 +291,6 @@
          manager->cursor_size_ns = NULL;
      }
  
-    if (sdl_img_ready) {
-        IMG_Quit();
-        sdl_img_ready = 0;
-    }
  }
  
  void cursor_manager_set_mouse_inside(cursor_manager_t *manager, int inside)
