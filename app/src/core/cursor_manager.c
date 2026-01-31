@@ -95,23 +95,6 @@ static int load_cursor_texture(SDL_Renderer *renderer, const char *path, int hot
     return 1;
 }
 
-static SDL_Cursor *load_color_cursor(const char *path, int hot_x, int hot_y)
-{
-    SDL_Log("cursor_manager: load_color_cursor %s", path);
-    SDL_Surface *surface = load_surface_for_cursor(path);
-    if (surface == NULL) {
-        SDL_Log("cursor_manager: failed to load %s", path);
-        return NULL;
-    }
-
-    SDL_Cursor *cursor = SDL_CreateColorCursor(surface, hot_x, hot_y);
-    SDL_FreeSurface(surface);
-    if (cursor == NULL) {
-        SDL_Log("cursor_manager: SDL_CreateColorCursor failed: %s", SDL_GetError());
-    }
-    return cursor;
-}
- 
 static int file_exists(const char *path)
 {
     SDL_RWops *file = SDL_RWFromFile(path, "rb");

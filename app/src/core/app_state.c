@@ -53,6 +53,7 @@ int app_state_add_window(app_state_t *app, const char *title, int width, int hei
     }
 
     window_state_t *window = &app->windows[app->window_count];
+    window->app = app;
     if (window_manager_init(window, title, width, height, x, y, use_position) != SKRONTCH_OK) {
         return 0;
     }
@@ -99,6 +100,13 @@ int app_state_handle_event(app_state_t *app, const SDL_Event *event)
 {
     if (app == NULL || event == NULL) {
         return 0;
+    }
+
+    if (event->type == SDL_KEYDOWN &&
+        event->key.keysym.sym == SDLK_q &&
+        (event->key.keysym.mod & KMOD_CTRL) != 0) {
+        app->is_running = 0;
+        return 1;
     }
 
     if (event->type == SDL_QUIT) {

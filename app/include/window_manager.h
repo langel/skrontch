@@ -34,6 +34,8 @@
      int parent;
  } split_node_t;
 
+typedef struct app_state_t app_state_t;
+
 typedef struct tab_state_t {
     split_node_t nodes[MAX_SPLIT_NODES];
     int node_count;
@@ -42,6 +44,7 @@ typedef struct tab_state_t {
 } tab_state_t;
 
 typedef struct window_state_t {
+    app_state_t *app;
      SDL_Window *window;
      SDL_Renderer *renderer;
     Uint32 window_id;

@@ -1,5 +1,6 @@
 #include "window_manager.h"
 #include "palette_manager.h"
+#include "app_state.h"
 
 #include <SDL.h>
 #include <string.h>
@@ -30,6 +31,7 @@ static void window_manager_clear(window_state_t *window)
     window->window = NULL;
     window->renderer = NULL;
     window->window_id = 0;
+    window->app = NULL;
     window->width = 0;
     window->height = 0;
     window->is_dragging_split = 0;
@@ -116,20 +118,33 @@ static int point_in_rect(int x, int y, const SDL_Rect *rect)
            y < rect->y + rect->h;
 }
 
-static int get_next_pane_id(tab_state_t *tab)
+static int pane_counter = 0;
+
+static void pane_counter_seed_from_tab(const tab_state_t *tab)
 {
-    int max_id = 0;
     if (tab == NULL) {
-        return 1;
+        return;
     }
 
     for (int i = 0; i < tab->node_count; ++i) {
-        if (tab->nodes[i].is_leaf && tab->nodes[i].pane_id > max_id) {
-            max_id = tab->nodes[i].pane_id;
+        if (!tab->nodes[i].is_leaf) {
+            continue;
+        }
+        if (tab->nodes[i].pane_id > pane_counter) {
+            pane_counter = tab->nodes[i].pane_id;
         }
     }
+}
 
-    return max_id + 1;
+static void pane_counter_seed_from_window(const window_state_t *window)
+{
+    if (window == NULL) {
+        return;
+    }
+
+    for (int t = 0; t < window->tab_count; ++t) {
+        pane_counter_seed_from_tab(&window->tabs[t]);
+    }
 }
 
 static SDL_Rect get_menu_bar_rect(window_state_t *window)
@@ -572,6 +587,30 @@ static int split_tree_layout(window_state_t *window, tab_state_t *tab, leaf_info
     return 1;
 }
 
+static void tab_state_init_default_with_ids(tab_state_t *tab)
+{
+    if (tab == NULL) {
+        return;
+    }
+
+    tab->node_count = 0;
+
+    int left_top = split_tree_add_leaf(tab, ++pane_counter);
+    int left_bottom = split_tree_add_leaf(tab, ++pane_counter);
+    int right_top = split_tree_add_leaf(tab, ++pane_counter);
+    int right_bottom = split_tree_add_leaf(tab, ++pane_counter);
+
+    int left_split = split_tree_add_split(tab, SPLIT_ORIENTATION_HORIZONTAL, 0.5f,
+        left_top, left_bottom);
+    int right_split = split_tree_add_split(tab, SPLIT_ORIENTATION_HORIZONTAL, 0.5f,
+        right_top, right_bottom);
+    int root_split = split_tree_add_split(tab, SPLIT_ORIENTATION_VERTICAL, 0.55f,
+        left_split, right_split);
+
+    tab->root_node = root_split;
+    tab->focused_pane_node = left_top;
+}
+
 static void tab_state_init_single(tab_state_t *tab, int pane_id)
 {
     if (tab == NULL) {
@@ -798,7 +837,7 @@ static int window_manager_handle_mouse_down(window_state_t *window, int mouse_x,
         }
         if (point_in_rect(mouse_x, mouse_y, &tab_add)) {
             if (window->tab_count < MAX_TABS) {
-                tab_state_init_default(&window->tabs[window->tab_count]);
+                tab_state_init_default_with_ids(&window->tabs[window->tab_count]);
                 window->active_tab = window->tab_count;
                 window->tab_count += 1;
                 window_manager_update_cursor(window);
@@ -814,7 +853,7 @@ static int window_manager_handle_mouse_down(window_state_t *window, int mouse_x,
         }
         if (point_in_rect(mouse_x, mouse_y, &menu_add)) {
             window->is_creating_pane = 1;
-            window->pending_pane_id = get_next_pane_id(tab);
+            window->pending_pane_id = ++pane_counter;
             window->esc_cancel_active = 0;
             window->hover_drop_zone = DROP_ZONE_NONE;
             window->is_dragging_header = 0;
@@ -1039,9 +1078,10 @@ skrontch_error_t window_manager_init(window_state_t *window, const char *title, 
     window_manager_update_cursor(window);
 
     window_manager_set_size(window, width, height);
-    tab_state_init_default(&window->tabs[0]);
+    tab_state_init_default_with_ids(&window->tabs[0]);
     window->tab_count = 1;
     window->active_tab = 0;
+    pane_counter_seed_from_window(window);
  
      return SKRONTCH_OK;
  }
@@ -1378,11 +1418,6 @@ int window_manager_handle_event(window_state_t *window, const SDL_Event *event)
                 state_changed = 1;
             }
         }
-        if (event->key.keysym.sym == SDLK_q &&
-            (event->key.keysym.mod & KMOD_CTRL) != 0) {
-            window->should_close = 1;
-            state_changed = 1;
-        }
     }
 
     if (event->type == SDL_KEYUP) {
@@ -1392,6 +1427,45 @@ int window_manager_handle_event(window_state_t *window, const SDL_Event *event)
     }
 
     return state_changed;
+}
+
+static void draw_number(SDL_Renderer *renderer, int value, const SDL_Rect *bounds, int spacing)
+{
+    if (renderer == NULL || bounds == NULL) {
+        return;
+    }
+
+    if (value < 0) {
+        value = 0;
+    }
+
+    int digits[8];
+    int count = 0;
+    if (value == 0) {
+        digits[count++] = 0;
+    } else {
+        while (value > 0 && count < (int)(sizeof(digits) / sizeof(digits[0]))) {
+            digits[count++] = value % 10;
+            value /= 10;
+        }
+        for (int i = 0; i < count / 2; ++i) {
+            int temp = digits[i];
+            digits[i] = digits[count - 1 - i];
+            digits[count - 1 - i] = temp;
+        }
+    }
+
+    if (count <= 0) {
+        return;
+    }
+
+    int total_width = bounds->w * count + spacing * (count - 1);
+    int start_x = bounds->x + (bounds->w - total_width) / 2;
+    int y = bounds->y;
+    for (int i = 0; i < count; ++i) {
+        SDL_Rect digit_bounds = { start_x + i * (bounds->w + spacing), y, bounds->w, bounds->h };
+        draw_digit(renderer, digits[i], &digit_bounds);
+    }
 }
  
 void window_manager_update(window_state_t *window, float delta_seconds)
@@ -1486,7 +1560,7 @@ void window_manager_render(window_state_t *window)
 
             SDL_Color digit_color = palette_get_color("white");
             SDL_SetRenderDrawColor(window->renderer, digit_color.r, digit_color.g, digit_color.b, digit_color.a);
-            draw_digit(window->renderer, pane_id, &digit_bounds);
+            draw_number(window->renderer, pane_id, &digit_bounds, digit_size / 5);
 
             SDL_Rect header_digit = {
                 leaves[i].rect.x + 8,
@@ -1494,7 +1568,7 @@ void window_manager_render(window_state_t *window)
                 14,
                 16
             };
-            draw_digit(window->renderer, pane_id, &header_digit);
+            draw_number(window->renderer, pane_id, &header_digit, 2);
         }
 
         if (leaves[i].node_index == tab->focused_pane_node) {
@@ -1675,9 +1749,10 @@ void window_manager_set_tabs(window_state_t *window, const tab_state_t *tabs, in
     for (int i = 0; i < tab_count; ++i) {
         window->tabs[i] = tabs[i];
         if (!tab_state_is_valid(&window->tabs[i])) {
-            tab_state_init_default(&window->tabs[i]);
+            tab_state_init_default_with_ids(&window->tabs[i]);
         }
     }
+    pane_counter_seed_from_window(window);
 
     window->tab_count = tab_count;
     if (active_tab < 0 || active_tab >= tab_count) {
