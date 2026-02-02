@@ -1,6 +1,12 @@
 #include <SDL.h>
 #include <stdio.h>
 
+#ifdef _WIN32
+#include <windows.h>
+#include <io.h>
+#include <fcntl.h>
+#endif
+
 #include "app_state.h"
 
 static const char *log_priority_label(SDL_LogPriority priority)
@@ -22,6 +28,33 @@ static const char *log_priority_label(SDL_LogPriority priority)
             return "UNKNOWN";
     }
 }
+
+#ifdef _WIN32
+static void attach_parent_console(void)
+{
+	if (AttachConsole(ATTACH_PARENT_PROCESS) == 0) {
+		return;
+	}
+
+	int out_handle = _open_osfhandle((intptr_t)GetStdHandle(STD_OUTPUT_HANDLE), _O_TEXT);
+	if (out_handle != -1) {
+		FILE *out = _fdopen(out_handle, "w");
+		if (out != NULL) {
+			*stdout = *out;
+			setvbuf(stdout, NULL, _IONBF, 0);
+		}
+	}
+
+	int err_handle = _open_osfhandle((intptr_t)GetStdHandle(STD_ERROR_HANDLE), _O_TEXT);
+	if (err_handle != -1) {
+		FILE *err = _fdopen(err_handle, "w");
+		if (err != NULL) {
+			*stderr = *err;
+			setvbuf(stderr, NULL, _IONBF, 0);
+		}
+	}
+}
+#endif
 
 typedef struct log_targets_t {
     FILE *file;
@@ -50,6 +83,10 @@ static void log_to_file_and_stderr(void *userdata, int category, SDL_LogPriority
      (void)argc;
      (void)argv;
  
+#ifdef _WIN32
+	attach_parent_console();
+#endif
+
 	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 	SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
 

@@ -21,7 +21,7 @@
  )
  
 set CFLAGS=-std=c99 -Wall -Wextra -I"%INCLUDE_DIR%" -I"%SDL_INCLUDE%"
-set LDFLAGS=-L"%SDL_LIB%" -lmingw32 -lSDL2main -lSDL2
+set LDFLAGS=-L"%SDL_LIB%" -lmingw32 -lSDL2main -lSDL2 -mwindows
  
  set SOURCES=
  for /r "%SRC_DIR%" %%f in (*.c) do (
@@ -33,7 +33,11 @@ set LDFLAGS=-L"%SDL_LIB%" -lmingw32 -lSDL2main -lSDL2
      exit /b 1
  )
  
- gcc %CFLAGS% %SOURCES% -o "%BUILD_DIR%\skrontch.exe" %LDFLAGS%
+if exist "skrontch.rc" (
+    windres "skrontch.rc" -O coff -o "%BUILD_DIR%\skrontch.res"
+)
+
+gcc %CFLAGS% %SOURCES% "%BUILD_DIR%\skrontch.res" -o "%BUILD_DIR%\skrontch.exe" %LDFLAGS%
  if errorlevel 1 exit /b 1
  
  if exist "%SDL_LIB%\SDL2.dll" (

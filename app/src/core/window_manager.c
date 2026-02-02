@@ -1373,6 +1373,21 @@ skrontch_error_t window_manager_init(window_state_t *window, const char *title, 
          return SKRONTCH_ERROR;
      }
  
+	char icon_path[512];
+#ifdef __APPLE__
+	const char *icon_file = "skrontch_icon_1024.png";
+#else
+	const char *icon_file = "skrontch_icon_256.png";
+#endif
+	SDL_Surface *icon_surface = NULL;
+	if (build_window_asset_path(icon_path, sizeof(icon_path), icon_file)) {
+		icon_surface = image_loader_load_rgba(icon_path);
+	}
+	if (icon_surface != NULL) {
+		SDL_SetWindowIcon(window->window, icon_surface);
+		SDL_FreeSurface(icon_surface);
+	}
+
     window->renderer = SDL_CreateRenderer(
         window->window,
          -1,
