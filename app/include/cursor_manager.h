@@ -9,7 +9,9 @@
 	 CURSOR_KIND_HAND_CLOSED = 2,
 	CURSOR_KIND_HAND_ONE_FINGER = 3,
 	CURSOR_KIND_RESIZE_WE = 4,
-	CURSOR_KIND_RESIZE_NS = 5
+	CURSOR_KIND_RESIZE_NS = 5,
+	CURSOR_KIND_RESIZE_NWSE = 6,
+	CURSOR_KIND_RESIZE_NESW = 7
  } cursor_kind_t;
  
  typedef struct custom_cursor_t {
@@ -24,6 +26,7 @@
 	 SDL_Renderer *renderer;
 	 int mouse_inside;
 	 int custom_cursor_enabled;
+	int use_system_cursor;
 	 cursor_kind_t active_kind;
 	 int mouse_x;
 	 int mouse_y;
@@ -33,11 +36,15 @@
 	custom_cursor_t cursor_hand_one_finger;
 	 custom_cursor_t cursor_resize_we;
 	 custom_cursor_t cursor_resize_ns;
+	custom_cursor_t cursor_resize_nwse;
+	custom_cursor_t cursor_resize_nesw;
 	 SDL_Cursor *cursor_arrow;
 	 SDL_Cursor *cursor_hand;
 	 SDL_Cursor *cursor_move;
 	 SDL_Cursor *cursor_size_we;
 	 SDL_Cursor *cursor_size_ns;
+	SDL_Cursor *cursor_size_nwse;
+	SDL_Cursor *cursor_size_nesw;
  } cursor_manager_t;
  
  void cursor_manager_init(cursor_manager_t *manager, SDL_Renderer *renderer);
@@ -45,6 +52,7 @@
  void cursor_manager_set_mouse_inside(cursor_manager_t *manager, int inside);
  void cursor_manager_set_mouse_position(cursor_manager_t *manager, int x, int y);
  void cursor_manager_set_active(cursor_manager_t *manager, cursor_kind_t kind);
+void cursor_manager_set_active_with_os(cursor_manager_t *manager, cursor_kind_t kind, int use_os_cursor);
  void cursor_manager_render(cursor_manager_t *manager);
  
  #endif

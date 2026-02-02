@@ -136,6 +136,16 @@ static int file_exists(const char *path) {
 				 ? &manager->cursor_resize_ns
 				 : &manager->cursor_pointer;
 			 break;
+		case CURSOR_KIND_RESIZE_NWSE:
+			cursor = manager->cursor_resize_nwse.texture != NULL
+				? &manager->cursor_resize_nwse
+				: &manager->cursor_pointer;
+			break;
+		case CURSOR_KIND_RESIZE_NESW:
+			cursor = manager->cursor_resize_nesw.texture != NULL
+				? &manager->cursor_resize_nesw
+				: &manager->cursor_pointer;
+			break;
 		 case CURSOR_KIND_POINTER:
 		 default:
 			 cursor = &manager->cursor_pointer;
@@ -161,6 +171,10 @@ static int file_exists(const char *path) {
 		 cursor = manager->cursor_size_we;
 	 } else if (manager->active_kind == CURSOR_KIND_RESIZE_NS) {
 		 cursor = manager->cursor_size_ns;
+	} else if (manager->active_kind == CURSOR_KIND_RESIZE_NWSE) {
+		cursor = manager->cursor_size_nwse;
+	} else if (manager->active_kind == CURSOR_KIND_RESIZE_NESW) {
+		cursor = manager->cursor_size_nesw;
 	 }
  
 	 if (cursor != NULL) {
@@ -176,6 +190,7 @@ static int file_exists(const char *path) {
 	 manager->renderer = renderer;
 	 manager->mouse_inside = 0;
 	 manager->custom_cursor_enabled = 0;
+	manager->use_system_cursor = 0;
 	 manager->active_kind = CURSOR_KIND_POINTER;
 	 manager->mouse_x = 0;
 	 manager->mouse_y = 0;
@@ -186,6 +201,8 @@ static int file_exists(const char *path) {
 	manager->cursor_hand_one_finger.texture = NULL;
 	 manager->cursor_resize_we.texture = NULL;
 	 manager->cursor_resize_ns.texture = NULL;
+	manager->cursor_resize_nwse.texture = NULL;
+	manager->cursor_resize_nesw.texture = NULL;
  
 	SDL_Log("cursor_manager_init start");
 	if (renderer == NULL) {
@@ -198,6 +215,8 @@ static int file_exists(const char *path) {
 	 manager->cursor_move = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEALL);
 	 manager->cursor_size_we = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZEWE);
 	 manager->cursor_size_ns = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENS);
+	manager->cursor_size_nwse = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENWSE);
+	manager->cursor_size_nesw = SDL_CreateSystemCursor(SDL_SYSTEM_CURSOR_SIZENESW);
  
 	SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "0");
 
@@ -243,6 +262,8 @@ static int file_exists(const char *path) {
 	destroy_cursor_texture(&manager->cursor_hand_one_finger);
 	 destroy_cursor_texture(&manager->cursor_resize_we);
 	 destroy_cursor_texture(&manager->cursor_resize_ns);
+	destroy_cursor_texture(&manager->cursor_resize_nwse);
+	destroy_cursor_texture(&manager->cursor_resize_nesw);
  
 	 if (manager->cursor_arrow != NULL) {
 		 SDL_FreeCursor(manager->cursor_arrow);
@@ -264,6 +285,14 @@ static int file_exists(const char *path) {
 		 SDL_FreeCursor(manager->cursor_size_ns);
 		 manager->cursor_size_ns = NULL;
 	 }
+	if (manager->cursor_size_nwse != NULL) {
+		SDL_FreeCursor(manager->cursor_size_nwse);
+		manager->cursor_size_nwse = NULL;
+	}
+	if (manager->cursor_size_nesw != NULL) {
+		SDL_FreeCursor(manager->cursor_size_nesw);
+		manager->cursor_size_nesw = NULL;
+	}
  
  }
  
@@ -287,23 +316,47 @@ static int file_exists(const char *path) {
 	 manager->mouse_y = y;
  }
  
- void cursor_manager_set_active(cursor_manager_t *manager, cursor_kind_t kind) {
-	 if (manager == NULL) {
-		 return;
-	 }
- 
-	 manager->active_kind = kind;
-	 if (!manager->custom_cursor_enabled) {
-		 update_system_cursor(manager);
-	 }
- }
+void cursor_manager_set_active(cursor_manager_t *manager, cursor_kind_t kind) {
+	cursor_manager_set_active_with_os(manager, kind, 1);
+}
+
+void cursor_manager_set_active_with_os(cursor_manager_t *manager, cursor_kind_t kind, int use_os_cursor) {
+	if (manager == NULL) {
+		return;
+	}
+
+	manager->active_kind = kind;
+	if (!manager->custom_cursor_enabled) {
+		manager->use_system_cursor = 1;
+		update_system_cursor(manager);
+		return;
+	}
+
+	manager->use_system_cursor = use_os_cursor &&
+		(kind == CURSOR_KIND_RESIZE_WE || kind == CURSOR_KIND_RESIZE_NS ||
+			kind == CURSOR_KIND_RESIZE_NWSE || kind == CURSOR_KIND_RESIZE_NESW);
+
+	if (manager->use_system_cursor) {
+		SDL_ShowCursor(SDL_ENABLE);
+		update_system_cursor(manager);
+	} else {
+		SDL_ShowCursor(manager->mouse_inside ? SDL_DISABLE : SDL_ENABLE);
+		if (manager->mouse_inside) {
+			SDL_ShowCursor(SDL_DISABLE);
+		}
+	}
+}
  
  void cursor_manager_render(cursor_manager_t *manager) {
 	 if (manager == NULL) {
 		 return;
 	 }
  
-	 if (!manager->custom_cursor_enabled || !manager->mouse_inside) {
+	if (!manager->custom_cursor_enabled || !manager->mouse_inside) {
+		return;
+	}
+
+	if (manager->use_system_cursor) {
 		 return;
 	 }
  
