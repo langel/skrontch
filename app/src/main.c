@@ -23,16 +23,26 @@ static const char *log_priority_label(SDL_LogPriority priority)
     }
 }
 
-static void log_to_file(void *userdata, int category, SDL_LogPriority priority,
+typedef struct log_targets_t {
+    FILE *file;
+    SDL_LogOutputFunction default_logger;
+    void *default_userdata;
+} log_targets_t;
+
+static void log_to_file_and_stderr(void *userdata, int category, SDL_LogPriority priority,
     const char *message)
 {
-    (void)category;
-    FILE *file = (FILE *)userdata;
-    if (file == NULL) {
-        return;
+    log_targets_t *targets = (log_targets_t *)userdata;
+    if (targets != NULL && targets->file != NULL) {
+        fprintf(targets->file, "[%s] %s\n", log_priority_label(priority), message);
+        fflush(targets->file);
     }
-    fprintf(file, "[%s] %s\n", log_priority_label(priority), message);
-    fflush(file);
+    if (targets != NULL && targets->default_logger != NULL) {
+        targets->default_logger(targets->default_userdata, category, priority, message);
+    } else {
+        fprintf(stderr, "[%s] %s\n", log_priority_label(priority), message);
+        fflush(stderr);
+    }
 }
  
  int main(int argc, char **argv)
@@ -48,8 +58,15 @@ static void log_to_file(void *userdata, int category, SDL_LogPriority priority,
      }
  
     FILE *log_file = fopen("skrontch.log", "w");
+    log_targets_t log_targets = { 0 };
     if (log_file != NULL) {
-        SDL_LogSetOutputFunction(log_to_file, log_file);
+        SDL_LogOutputFunction default_logger = NULL;
+        void *default_userdata = NULL;
+        SDL_LogGetOutputFunction(&default_logger, &default_userdata);
+        log_targets.file = log_file;
+        log_targets.default_logger = default_logger;
+        log_targets.default_userdata = default_userdata;
+        SDL_LogSetOutputFunction(log_to_file_and_stderr, &log_targets);
         SDL_LogSetAllPriority(SDL_LOG_PRIORITY_VERBOSE);
         SDL_Log("logging enabled");
     }
@@ -72,7 +89,7 @@ static void log_to_file(void *userdata, int category, SDL_LogPriority priority,
     while (app_state.is_running) {
          while (SDL_PollEvent(&event) != 0) {
             int state_changed = app_state_handle_event(&app_state, &event);
-            if (state_changed) {
+            if (state_changed && !app_state.suppress_workspace_save) {
                 workspace_manager_mark_dirty(&app_state.workspace);
             }
          }

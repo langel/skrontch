@@ -10,6 +10,7 @@ typedef struct app_state_t {
     window_state_t windows[MAX_WINDOWS];
     int window_count;
     int is_running;
+    int suppress_workspace_save;
     workspace_manager_t workspace;
 } app_state_t;
 

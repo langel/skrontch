@@ -19,5 +19,6 @@ int workspace_manager_load(workspace_manager_t *workspace, app_state_t *app, con
     int default_width, int default_height);
 void workspace_manager_mark_dirty(workspace_manager_t *workspace);
 void workspace_manager_update(workspace_manager_t *workspace, const app_state_t *app);
+void workspace_manager_reset(workspace_manager_t *workspace);
 
 #endif

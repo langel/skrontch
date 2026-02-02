@@ -97,5 +97,6 @@ void window_manager_set_tabs(window_state_t *window, const tab_state_t *tabs, in
 int window_manager_extract_detached_tab(window_state_t *window, tab_state_t *tab_out);
 void window_manager_get_window_rect(window_state_t *window, int *x, int *y, int *w, int *h);
 void tab_state_init_default(tab_state_t *tab);
+void window_manager_reset_pane_counter(void);
  
  #endif

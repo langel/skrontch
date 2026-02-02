@@ -120,6 +120,11 @@ static int point_in_rect(int x, int y, const SDL_Rect *rect)
 
 static int pane_counter = 0;
 
+void window_manager_reset_pane_counter(void)
+{
+    pane_counter = 0;
+}
+
 static void pane_counter_seed_from_tab(const tab_state_t *tab)
 {
     if (tab == NULL) {
@@ -911,6 +916,8 @@ static int window_manager_handle_mouse_down(window_state_t *window, int mouse_x,
         SDL_Rect detach_rect = get_header_detach_rect(&header_rect);
         if (header_rect.w >= HEADER_BUTTON_SIZE + HEADER_BUTTON_PADDING * 2 &&
             point_in_rect(mouse_x, mouse_y, &close_rect)) {
+            SDL_Log("window_manager: close pane clicked (leaf_count=%d, pane_counter=%d)",
+                leaf_count, pane_counter);
             if (leaf_count > 1) {
                 int closed_node = leaves[leaf_index].node_index;
                 split_tree_detach_leaf(tab, closed_node);
@@ -919,6 +926,19 @@ static int window_manager_handle_mouse_down(window_state_t *window, int mouse_x,
                     tab->focused_pane_node = leaves[0].node_index;
                 } else {
                     tab->focused_pane_node = -1;
+                }
+                window_manager_update_cursor(window);
+                return 1;
+            } else {
+                tab->node_count = 0;
+                tab->root_node = -1;
+                tab->focused_pane_node = -1;
+                window->should_close = 1;
+                pane_counter = 0;
+                if (window->app != NULL) {
+                    SDL_Log("window_manager: last pane closed, resetting workspace");
+                    window->app->suppress_workspace_save = 1;
+                    workspace_manager_reset(&window->app->workspace);
                 }
                 window_manager_update_cursor(window);
                 return 1;

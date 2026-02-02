@@ -6,6 +6,7 @@ static void app_state_clear(app_state_t *app)
 {
     app->window_count = 0;
     app->is_running = 1;
+    app->suppress_workspace_save = 0;
 }
 
 static void app_state_remove_window(app_state_t *app, int index)
@@ -17,6 +18,7 @@ static void app_state_remove_window(app_state_t *app, int index)
     window_manager_shutdown(&app->windows[index]);
     for (int i = index; i < app->window_count - 1; ++i) {
         app->windows[i] = app->windows[i + 1];
+        app->windows[i].app = app;
     }
     app->window_count -= 1;
 }
@@ -53,10 +55,10 @@ int app_state_add_window(app_state_t *app, const char *title, int width, int hei
     }
 
     window_state_t *window = &app->windows[app->window_count];
-    window->app = app;
     if (window_manager_init(window, title, width, height, x, y, use_position) != SKRONTCH_OK) {
         return 0;
     }
+    window->app = app;
 
     if (tabs != NULL && tab_count > 0) {
         window_manager_set_tabs(window, tabs, tab_count, active_tab);
@@ -173,6 +175,7 @@ void app_state_update(app_state_t *app, float delta_seconds)
     }
 
     workspace_manager_update(&app->workspace, app);
+    app->suppress_workspace_save = 0;
 }
 
 void app_state_render(app_state_t *app)

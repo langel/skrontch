@@ -836,3 +836,34 @@ void workspace_manager_update(workspace_manager_t *workspace, const app_state_t 
         workspace->is_dirty = 0;
     }
 }
+
+void workspace_manager_reset(workspace_manager_t *workspace)
+{
+    if (workspace == NULL) {
+        return;
+    }
+
+    SDL_Log("workspace_manager_reset: start");
+
+    if (workspace->workspace_path[0] == '\0') {
+        workspace_build_path(workspace, 0);
+    }
+
+    if (workspace->workspace_path[0] != '\0') {
+        SDL_Log("workspace_manager_reset: removing %s", workspace->workspace_path);
+        if (remove(workspace->workspace_path) != 0) {
+            SDL_Log("workspace_manager_reset: failed to remove %s (errno=%d)",
+                workspace->workspace_path, errno);
+            FILE *file = fopen(workspace->workspace_path, "wb");
+            if (file != NULL) {
+                fclose(file);
+            }
+            if (remove(workspace->workspace_path) != 0) {
+                SDL_Log("workspace_manager_reset: retry remove failed (errno=%d)", errno);
+            }
+        }
+    }
+
+    workspace->is_dirty = 0;
+    workspace->last_change_ticks = 0;
+}
