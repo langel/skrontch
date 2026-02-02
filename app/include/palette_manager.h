@@ -7,3 +7,4 @@
  SDL_Color palette_get_color_or(const char *name, SDL_Color fallback);
  
  #endif
+
