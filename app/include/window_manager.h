@@ -3,6 +3,7 @@
  
 #include <SDL.h>
 
+#include "app_state_fwd.h"
 #include "cursor_manager.h"
 #include "skrontch_types.h"
  
@@ -33,8 +34,6 @@
      int second;
      int parent;
  } split_node_t;
-
-typedef struct app_state_t app_state_t;
 
 typedef struct tab_state_t {
     split_node_t nodes[MAX_SPLIT_NODES];

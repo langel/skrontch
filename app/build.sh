@@ -10,8 +10,11 @@ INCLUDE_DIR="include"
 
 mkdir -p "$BUILD_DIR"
 
-CFLAGS="-std=c99 -Wall -Wextra -I$INCLUDE_DIR $(sdl2-config --cflags)"
-LDFLAGS="$(sdl2-config --libs)"
+SDL_CFLAGS="$(sdl2-config --cflags)"
+SDL_LIBS="$(sdl2-config --libs)"
+
+CFLAGS="-std=c99 -Wall -Wextra -I$INCLUDE_DIR $SDL_CFLAGS"
+LDFLAGS="$SDL_LIBS"
 
 SOURCES=$(find "$SRC_DIR" -name "*.c")
 

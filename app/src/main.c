@@ -87,6 +87,9 @@ static void log_to_file_and_stderr(void *userdata, int category, SDL_LogPriority
 	attach_parent_console();
 #endif
 
+#ifdef SDL_HINT_VIDEO_COCOA_WINDOW_IMMEDIATE
+	SDL_SetHint(SDL_HINT_VIDEO_COCOA_WINDOW_IMMEDIATE, "1");
+#endif
 	SDL_SetHint(SDL_HINT_MOUSE_FOCUS_CLICKTHROUGH, "1");
 	SDL_SetHint(SDL_HINT_VIDEO_MINIMIZE_ON_FOCUS_LOSS, "0");
 
@@ -125,12 +128,17 @@ static void log_to_file_and_stderr(void *userdata, int category, SDL_LogPriority
      Uint64 last_ticks = SDL_GetTicks64();
  
     while (app_state.is_running) {
-         while (SDL_PollEvent(&event) != 0) {
+        int event_budget = 200;
+        while (SDL_PollEvent(&event) != 0) {
             int state_changed = app_state_handle_event(&app_state, &event);
             if (state_changed && !app_state.suppress_workspace_save) {
                 workspace_manager_mark_dirty(&app_state.workspace);
             }
-         }
+            event_budget -= 1;
+            if (event_budget <= 0) {
+                break;
+            }
+        }
  
          Uint64 current_ticks = SDL_GetTicks64();
          float delta_seconds = (float)(current_ticks - last_ticks) / 1000.0f;

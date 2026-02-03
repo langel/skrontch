@@ -62,6 +62,21 @@ static int app_state_find_window_index(const app_state_t *app, Uint32 window_id)
 	return -1;
 }
 
+static int app_state_find_window_index_by_ptr(const app_state_t *app, const SDL_Window *window)
+{
+	if (app == NULL || window == NULL) {
+		return -1;
+	}
+
+	for (int i = 0; i < app->window_count; ++i) {
+		if (app->windows[i].window == window) {
+			return i;
+		}
+	}
+
+	return -1;
+}
+
 int app_state_add_window(app_state_t *app, const char *title, int width, int height, int x, int y,
     int use_position, const tab_state_t *tabs, int tab_count, int active_tab)
 {
@@ -120,32 +135,52 @@ int app_state_handle_event(app_state_t *app, const SDL_Event *event)
         return 0;
     }
 
-	if (event->type == SDL_KEYDOWN &&
-		(event->key.keysym.mod & KMOD_CTRL) != 0 &&
-		(event->key.keysym.mod & KMOD_SHIFT) != 0 &&
+	if (event->type == SDL_KEYDOWN) {
+		const Uint8 *keys = SDL_GetKeyboardState(NULL);
+		int ctrl_down = 0;
+		int shift_down = 0;
+		if (keys != NULL) {
+			ctrl_down = keys[SDL_SCANCODE_LCTRL] || keys[SDL_SCANCODE_RCTRL] ||
+				keys[SDL_SCANCODE_LGUI] || keys[SDL_SCANCODE_RGUI];
+			shift_down = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
+		}
+		Uint16 mod_state = SDL_GetModState();
+		Uint16 mods = mod_state | event->key.keysym.mod;
+		if ((!ctrl_down && ((mods & KMOD_CTRL) != 0 || (mods & KMOD_GUI) != 0))) {
+			ctrl_down = 1;
+		}
+		if (!shift_down && (mods & KMOD_SHIFT) != 0) {
+			shift_down = 1;
+		}
+		if (ctrl_down && shift_down &&
 		(event->key.keysym.sym == SDLK_LEFT || event->key.keysym.sym == SDLK_RIGHT)) {
-		Uint32 window_id = app_state_get_event_window_id(event);
-		int current_index = app_state_find_window_index(app, window_id);
-		if (current_index >= 0 && app->window_count > 1) {
-			int direction = event->key.keysym.sym == SDLK_LEFT ? -1 : 1;
-			int next_index = current_index + direction;
-			if (next_index < 0) {
-				next_index = app->window_count - 1;
-			} else if (next_index >= app->window_count) {
-				next_index = 0;
+			SDL_Window *focused = SDL_GetKeyboardFocus();
+			int current_index = app_state_find_window_index_by_ptr(app, focused);
+			if (current_index < 0) {
+				Uint32 window_id = app_state_get_event_window_id(event);
+				current_index = app_state_find_window_index(app, window_id);
 			}
-			SDL_Window *target = app->windows[next_index].window;
-			if (target != NULL) {
-				Uint32 flags = SDL_GetWindowFlags(target);
-				if ((flags & SDL_WINDOW_MINIMIZED) != 0) {
-					SDL_RestoreWindow(target);
+			if (current_index >= 0 && app->window_count > 1) {
+				int direction = event->key.keysym.sym == SDLK_LEFT ? -1 : 1;
+				int next_index = current_index + direction;
+				if (next_index < 0) {
+					next_index = app->window_count - 1;
+				} else if (next_index >= app->window_count) {
+					next_index = 0;
 				}
-				SDL_RaiseWindow(target);
-				SDL_SetWindowInputFocus(target);
-				window_manager_sync_mouse_inside(&app->windows[next_index]);
+				SDL_Window *target = app->windows[next_index].window;
+				if (target != NULL) {
+					Uint32 flags = SDL_GetWindowFlags(target);
+					if ((flags & SDL_WINDOW_MINIMIZED) != 0) {
+						SDL_RestoreWindow(target);
+					}
+					SDL_RaiseWindow(target);
+					SDL_SetWindowInputFocus(target);
+					window_manager_sync_mouse_inside(&app->windows[next_index]);
+				}
+				app->suppress_workspace_save = 1;
+				return 1;
 			}
-			app->suppress_workspace_save = 1;
-			return 1;
 		}
 	}
 

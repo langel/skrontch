@@ -3,9 +3,8 @@
 
 #include <SDL.h>
 
+#include "app_state_fwd.h"
 #include "window_manager.h"
-
-typedef struct app_state_t app_state_t;
 
 typedef struct workspace_manager_t {
     char workspace_path[512];

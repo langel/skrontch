@@ -98,6 +98,10 @@ static void window_manager_set_size(window_state_t *window, int width, int heigh
  
     window->width = width;
     window->height = height;
+    if (window->renderer != NULL) {
+        SDL_RenderSetViewport(window->renderer, NULL);
+        SDL_RenderSetScale(window->renderer, 1.0f, 1.0f);
+    }
  }
  
 static int clamp_int(int value, int min_value, int max_value)
@@ -121,6 +125,8 @@ static float clamp_float(float value, float min_value, float max_value)
     }
     return value;
 }
+
+static int window_manager_apply_resize_drag(window_state_t *window);
 
 static SDL_Rect make_rect(int x, int y, int w, int h)
 {
@@ -287,12 +293,31 @@ static int build_window_asset_path(char *buffer, size_t buffer_size, const char 
 		}
 	}
 
+	int found = 0;
 	int wrote = snprintf(buffer, buffer_size, "%s%cassets%c%s",
 		root_buffer, separator, separator, filename);
+	if (wrote > 0 && (size_t)wrote < buffer_size) {
+		SDL_RWops *file = SDL_RWFromFile(buffer, "rb");
+		if (file != NULL) {
+			SDL_RWclose(file);
+			found = 1;
+		}
+	}
+	if (!found) {
+		wrote = snprintf(buffer, buffer_size, "%s%cResources%cassets%c%s",
+			root_buffer, separator, separator, separator, filename);
+		if (wrote > 0 && (size_t)wrote < buffer_size) {
+			SDL_RWops *file = SDL_RWFromFile(buffer, "rb");
+			if (file != NULL) {
+				SDL_RWclose(file);
+				found = 1;
+			}
+		}
+	}
 	if (base_path != NULL) {
 		SDL_free(base_path);
 	}
-	return wrote > 0 && (size_t)wrote < buffer_size;
+	return found;
 }
 
 static SDL_Rect get_tab_bar_rect(window_state_t *window)
@@ -307,14 +332,6 @@ static SDL_Rect get_menu_close_rect(window_state_t *window)
 {
     int width = window != NULL ? window->width : 0;
     int x = width - MENU_BUTTON_PADDING - MENU_BUTTON_SIZE;
-    int y = (MENU_HEIGHT - MENU_BUTTON_SIZE) / 2;
-    return make_rect(x, y, MENU_BUTTON_SIZE, MENU_BUTTON_SIZE);
-}
-
-static SDL_Rect get_menu_add_rect(window_state_t *window)
-{
-    int width = window != NULL ? window->width : 0;
-    int x = width - MENU_BUTTON_PADDING * 2 - MENU_BUTTON_SIZE * 2;
     int y = (MENU_HEIGHT - MENU_BUTTON_SIZE) / 2;
     return make_rect(x, y, MENU_BUTTON_SIZE, MENU_BUTTON_SIZE);
 }
@@ -1388,10 +1405,14 @@ skrontch_error_t window_manager_init(window_state_t *window, const char *title, 
 		SDL_FreeSurface(icon_surface);
 	}
 
+	Uint32 renderer_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
+#ifdef __APPLE__
+	renderer_flags = SDL_RENDERER_SOFTWARE;
+#endif
     window->renderer = SDL_CreateRenderer(
         window->window,
          -1,
-         SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC
+         renderer_flags
      );
  
     if (window->renderer == NULL) {
@@ -1742,58 +1763,10 @@ int window_manager_handle_event(window_state_t *window, const SDL_Event *event)
 		}
 
 		if (window->is_resizing_window) {
-			int global_x = 0;
-			int global_y = 0;
-			SDL_GetGlobalMouseState(&global_x, &global_y);
-			int dx = global_x - window->resize_mouse_start_x;
-			int dy = global_y - window->resize_mouse_start_y;
-
-			int new_x = window->resize_start_x;
-			int new_y = window->resize_start_y;
-			int new_w = window->resize_start_w;
-			int new_h = window->resize_start_h;
-
-			if (window->resize_mode == RESIZE_MODE_LEFT ||
-				window->resize_mode == RESIZE_MODE_TOPLEFT ||
-				window->resize_mode == RESIZE_MODE_BOTTOMLEFT) {
-				new_w = window->resize_start_w - dx;
-				if (new_w < WINDOW_MIN_WIDTH) {
-					new_w = WINDOW_MIN_WIDTH;
-					dx = window->resize_start_w - new_w;
-				}
-				new_x = window->resize_start_x + dx;
+			if (window_manager_apply_resize_drag(window)) {
+				state_changed = 1;
+				window_manager_render(window);
 			}
-			if (window->resize_mode == RESIZE_MODE_RIGHT ||
-				window->resize_mode == RESIZE_MODE_TOPRIGHT ||
-				window->resize_mode == RESIZE_MODE_BOTTOMRIGHT) {
-				new_w = window->resize_start_w + dx;
-				if (new_w < WINDOW_MIN_WIDTH) {
-					new_w = WINDOW_MIN_WIDTH;
-				}
-			}
-			if (window->resize_mode == RESIZE_MODE_TOP ||
-				window->resize_mode == RESIZE_MODE_TOPLEFT ||
-				window->resize_mode == RESIZE_MODE_TOPRIGHT) {
-				new_h = window->resize_start_h - dy;
-				if (new_h < WINDOW_MIN_HEIGHT) {
-					new_h = WINDOW_MIN_HEIGHT;
-					dy = window->resize_start_h - new_h;
-				}
-				new_y = window->resize_start_y + dy;
-			}
-			if (window->resize_mode == RESIZE_MODE_BOTTOM ||
-				window->resize_mode == RESIZE_MODE_BOTTOMLEFT ||
-				window->resize_mode == RESIZE_MODE_BOTTOMRIGHT) {
-				new_h = window->resize_start_h + dy;
-				if (new_h < WINDOW_MIN_HEIGHT) {
-					new_h = WINDOW_MIN_HEIGHT;
-				}
-			}
-
-			SDL_SetWindowPosition(window->window, new_x, new_y);
-			SDL_SetWindowSize(window->window, new_w, new_h);
-			window_manager_set_size(window, new_w, new_h);
-			state_changed = 1;
 		} else {
 			window->resize_mode = window_get_resize_mode(window, mouse_x, mouse_y);
 		}
@@ -1945,6 +1918,66 @@ static void draw_number(SDL_Renderer *renderer, int value, const SDL_Rect *bound
     }
 }
  
+static int window_manager_apply_resize_drag(window_state_t *window)
+{
+	if (window == NULL || !window->is_resizing_window) {
+		return 0;
+	}
+
+	int global_x = 0;
+	int global_y = 0;
+	SDL_GetGlobalMouseState(&global_x, &global_y);
+	int dx = global_x - window->resize_mouse_start_x;
+	int dy = global_y - window->resize_mouse_start_y;
+
+	int new_x = window->resize_start_x;
+	int new_y = window->resize_start_y;
+	int new_w = window->resize_start_w;
+	int new_h = window->resize_start_h;
+
+	if (window->resize_mode == RESIZE_MODE_LEFT ||
+		window->resize_mode == RESIZE_MODE_TOPLEFT ||
+		window->resize_mode == RESIZE_MODE_BOTTOMLEFT) {
+		new_w = window->resize_start_w - dx;
+		if (new_w < WINDOW_MIN_WIDTH) {
+			new_w = WINDOW_MIN_WIDTH;
+			dx = window->resize_start_w - new_w;
+		}
+		new_x = window->resize_start_x + dx;
+	}
+	if (window->resize_mode == RESIZE_MODE_RIGHT ||
+		window->resize_mode == RESIZE_MODE_TOPRIGHT ||
+		window->resize_mode == RESIZE_MODE_BOTTOMRIGHT) {
+		new_w = window->resize_start_w + dx;
+		if (new_w < WINDOW_MIN_WIDTH) {
+			new_w = WINDOW_MIN_WIDTH;
+		}
+	}
+	if (window->resize_mode == RESIZE_MODE_TOP ||
+		window->resize_mode == RESIZE_MODE_TOPLEFT ||
+		window->resize_mode == RESIZE_MODE_TOPRIGHT) {
+		new_h = window->resize_start_h - dy;
+		if (new_h < WINDOW_MIN_HEIGHT) {
+			new_h = WINDOW_MIN_HEIGHT;
+			dy = window->resize_start_h - new_h;
+		}
+		new_y = window->resize_start_y + dy;
+	}
+	if (window->resize_mode == RESIZE_MODE_BOTTOM ||
+		window->resize_mode == RESIZE_MODE_BOTTOMLEFT ||
+		window->resize_mode == RESIZE_MODE_BOTTOMRIGHT) {
+		new_h = window->resize_start_h + dy;
+		if (new_h < WINDOW_MIN_HEIGHT) {
+			new_h = WINDOW_MIN_HEIGHT;
+		}
+	}
+
+	SDL_SetWindowPosition(window->window, new_x, new_y);
+	SDL_SetWindowSize(window->window, new_w, new_h);
+	window_manager_set_size(window, new_w, new_h);
+	return 1;
+}
+
 void window_manager_update(window_state_t *window, float delta_seconds)
  {
     if (window == NULL) {
@@ -1952,6 +1985,11 @@ void window_manager_update(window_state_t *window, float delta_seconds)
      }
  
      (void)delta_seconds;
+	if (window->is_resizing_window) {
+		if (window_manager_apply_resize_drag(window)) {
+			window_manager_render(window);
+		}
+	}
  }
  
 void window_manager_render(window_state_t *window)
@@ -1960,11 +1998,17 @@ void window_manager_render(window_state_t *window)
          return;
      }
  
-     int render_width = 0;
-     int render_height = 0;
-    if (SDL_GetRendererOutputSize(window->renderer, &render_width, &render_height) == 0) {
-        window_manager_set_size(window, render_width, render_height);
-     }
+    int window_width = 0;
+    int window_height = 0;
+    if (window->window != NULL) {
+        SDL_GetWindowSize(window->window, &window_width, &window_height);
+        if (window_width > 0 && window_height > 0 &&
+            (window_width != window->width || window_height != window->height)) {
+            window_manager_set_size(window, window_width, window_height);
+        }
+    }
+    SDL_RenderSetViewport(window->renderer, NULL);
+    SDL_RenderSetScale(window->renderer, 1.0f, 1.0f);
  
     SDL_Color background = palette_get_color("black");
     SDL_SetRenderDrawColor(window->renderer, background.r, background.g, background.b, background.a);
