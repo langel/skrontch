@@ -20,7 +20,7 @@
      set SDL_LIB=%SDL2_DIR%\lib
  )
  
-set CFLAGS=-std=c99 -Wall -Wextra -I"%INCLUDE_DIR%" -I"%SDL_INCLUDE%"
+set CFLAGS=-std=c99 -Wall -Wextra -I"%INCLUDE_DIR%" -I"%SRC_DIR%" -I"%SDL_INCLUDE%"
 set LDFLAGS=-L"%SDL_LIB%" -lmingw32 -lSDL2main -lSDL2 -mwindows
  
  set SOURCES=
