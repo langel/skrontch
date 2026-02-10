@@ -2,6 +2,7 @@
 #define APP_STATE_H
 
 #include "app_state_fwd.h"
+#include "input_state.h"
 #include "window_manager.h"
 #include "workspace_manager.h"
 
@@ -12,6 +13,7 @@ struct app_state_t {
     int window_count;
     int is_running;
     int suppress_workspace_save;
+    input_state_t input;
     workspace_manager_t workspace;
 };
 

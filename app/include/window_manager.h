@@ -5,10 +5,12 @@
 
 #include "app_state_fwd.h"
 #include "cursor_manager.h"
+#include "gizmo_api.h"
 #include "skrontch_types.h"
  
 #define MAX_SPLIT_NODES 31
 #define MAX_TABS 12
+#define MAX_PANE_GIZMOS 512
 
  typedef enum {
      SPLIT_ORIENTATION_NONE = 0,
@@ -42,6 +44,15 @@ typedef struct tab_state_t {
     int focused_pane_node;
 } tab_state_t;
 
+typedef struct pane_gizmo_slot_t {
+    int in_use;
+    int pane_id;
+    int last_width;
+    int last_height;
+    char title[GIZMO_DISPLAY_NAME_MAX];
+    gizmo_instance_t gizmo;
+} pane_gizmo_slot_t;
+
 typedef struct window_state_t {
     app_state_t *app;
      SDL_Window *window;
@@ -61,6 +72,7 @@ typedef struct window_state_t {
      int hover_pane_index;
      int hover_header;
     int hover_header_close;
+    int hover_header_clone;
     int hover_menu_button;
 	int hover_menu_bar;
      int hover_split_node;
@@ -96,6 +108,11 @@ typedef struct window_state_t {
     tab_state_t tabs[MAX_TABS];
     int tab_count;
     int active_tab;
+    pane_gizmo_slot_t pane_gizmos[MAX_PANE_GIZMOS];
+    gizmo_gui_context_t gizmo_gui;
+    gizmo_core_context_t gizmo_core;
+    gizmo_action_queue_t gizmo_queue;
+    float last_delta_seconds;
     cursor_manager_t cursor_manager;
     int is_mouse_pressed;
 } window_state_t;

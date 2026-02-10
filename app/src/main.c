@@ -128,8 +128,10 @@ static void log_to_file_and_stderr(void *userdata, int category, SDL_LogPriority
      Uint64 last_ticks = SDL_GetTicks64();
  
     while (app_state.is_running) {
+        input_state_begin_frame(&app_state.input);
         int event_budget = 200;
         while (SDL_PollEvent(&event) != 0) {
+            input_state_handle_event(&app_state.input, &event);
             int state_changed = app_state_handle_event(&app_state, &event);
             if (state_changed && !app_state.suppress_workspace_save) {
                 workspace_manager_mark_dirty(&app_state.workspace);

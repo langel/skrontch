@@ -7,6 +7,7 @@ static void app_state_clear(app_state_t *app)
     app->window_count = 0;
     app->is_running = 1;
     app->suppress_workspace_save = 0;
+    input_state_init(&app->input);
 }
 
 static void app_state_remove_window(app_state_t *app, int index)

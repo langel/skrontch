@@ -1,9 +1,11 @@
 #include "window_manager.h"
-#include "palette_manager.h"
 #include "app_state.h"
+#include "gizmos/gizmo_runtime.h"
 #include "image_loader.h"
+#include "palette_manager.h"
 
 #include <SDL.h>
+#include <stdio.h>
 #include <string.h>
  
 enum {
@@ -14,6 +16,8 @@ enum {
     MENU_BORDER_THICKNESS = 2,
     HEADER_BUTTON_SIZE = 14,
     HEADER_BUTTON_PADDING = 6,
+    HEADER_CLONE_SIZE = 14,
+    HEADER_CLONE_PADDING = 6,
     HEADER_DETACH_SIZE = 14,
     HEADER_DETACH_PADDING = 6,
     TAB_HEIGHT = 20,
@@ -51,9 +55,9 @@ static void window_manager_clear(window_state_t *window)
     window->hover_pane_index = -1;
     window->hover_header = 0;
     window->hover_header_close = 0;
-			window->hover_menu_button = 0;
-			window->hover_menu_bar = 0;
-	window->hover_menu_bar = 0;
+    window->hover_header_clone = 0;
+    window->hover_menu_button = 0;
+    window->hover_menu_bar = 0;
     window->hover_split_node = -1;
     window->hover_drop_zone = DROP_ZONE_NONE;
     window->esc_cancel_active = 0;
@@ -87,6 +91,11 @@ static void window_manager_clear(window_state_t *window)
     window->should_close = 0;
     window->tab_count = 0;
     window->active_tab = 0;
+    memset(window->pane_gizmos, 0, sizeof(window->pane_gizmos));
+    memset(&window->gizmo_gui, 0, sizeof(window->gizmo_gui));
+    memset(&window->gizmo_core, 0, sizeof(window->gizmo_core));
+    memset(&window->gizmo_queue, 0, sizeof(window->gizmo_queue));
+    window->last_delta_seconds = 0.0f;
     memset(&window->cursor_manager, 0, sizeof(window->cursor_manager));
  }
  
@@ -127,6 +136,8 @@ static float clamp_float(float value, float min_value, float max_value)
 }
 
 static int window_manager_apply_resize_drag(window_state_t *window);
+static int split_tree_insert_new_pane(tab_state_t *tab, int target_node,
+    int new_pane_id, drop_zone_t zone, const SDL_Rect *target_rect);
 
 static SDL_Rect make_rect(int x, int y, int w, int h)
 {
@@ -177,6 +188,232 @@ static void pane_counter_seed_from_window(const window_state_t *window)
     for (int t = 0; t < window->tab_count; ++t) {
         pane_counter_seed_from_tab(&window->tabs[t]);
     }
+}
+
+static int window_enqueue_gizmo_request(void *userdata, const gizmo_action_request_t *request)
+{
+    window_state_t *window = (window_state_t *)userdata;
+    if (window == NULL || request == NULL) {
+        return 0;
+    }
+    if (window->gizmo_queue.count >= GIZMO_MAX_ACTIONS_PER_FRAME) {
+        return 0;
+    }
+    window->gizmo_queue.items[window->gizmo_queue.count] = *request;
+    window->gizmo_queue.count += 1;
+    return 1;
+}
+
+static pane_gizmo_slot_t *window_find_pane_slot(window_state_t *window, int pane_id)
+{
+    if (window == NULL || pane_id <= 0) {
+        return NULL;
+    }
+    for (int i = 0; i < MAX_PANE_GIZMOS; ++i) {
+        if (window->pane_gizmos[i].in_use && window->pane_gizmos[i].pane_id == pane_id) {
+            return &window->pane_gizmos[i];
+        }
+    }
+    return NULL;
+}
+
+static pane_gizmo_slot_t *window_alloc_pane_slot(window_state_t *window, int pane_id)
+{
+    if (window == NULL || pane_id <= 0) {
+        return NULL;
+    }
+    pane_gizmo_slot_t *existing = window_find_pane_slot(window, pane_id);
+    if (existing != NULL) {
+        return existing;
+    }
+
+    for (int i = 0; i < MAX_PANE_GIZMOS; ++i) {
+        if (window->pane_gizmos[i].in_use) {
+            continue;
+        }
+        pane_gizmo_slot_t *slot = &window->pane_gizmos[i];
+        memset(slot, 0, sizeof(*slot));
+        slot->in_use = 1;
+        slot->pane_id = pane_id;
+        slot->last_width = -1;
+        slot->last_height = -1;
+        SDL_strlcpy(slot->title, "Pane", sizeof(slot->title));
+        return slot;
+    }
+    return NULL;
+}
+
+static int window_collect_active_pane_ids(const window_state_t *window, int *pane_ids, int max_ids)
+{
+    if (window == NULL || pane_ids == NULL || max_ids <= 0) {
+        return 0;
+    }
+
+    int count = 0;
+    for (int t = 0; t < window->tab_count; ++t) {
+        const tab_state_t *tab = &window->tabs[t];
+        for (int i = 0; i < tab->node_count; ++i) {
+            if (!tab->nodes[i].is_leaf) {
+                continue;
+            }
+            int pane_id = tab->nodes[i].pane_id;
+            int found = 0;
+            for (int j = 0; j < count; ++j) {
+                if (pane_ids[j] == pane_id) {
+                    found = 1;
+                    break;
+                }
+            }
+            if (found) {
+                continue;
+            }
+            if (count >= max_ids) {
+                return count;
+            }
+            pane_ids[count++] = pane_id;
+        }
+    }
+    return count;
+}
+
+static int window_next_unique_pane_id(window_state_t *window)
+{
+    if (window == NULL) {
+        return ++pane_counter;
+    }
+
+    int active_ids[MAX_PANE_GIZMOS];
+    int active_count = window_collect_active_pane_ids(window, active_ids, MAX_PANE_GIZMOS);
+
+    int candidate = pane_counter;
+    int guard = 0;
+    while (guard < (MAX_PANE_GIZMOS * 4)) {
+        candidate += 1;
+        int exists = 0;
+        for (int i = 0; i < active_count; ++i) {
+            if (active_ids[i] == candidate) {
+                exists = 1;
+                break;
+            }
+        }
+        if (!exists) {
+            pane_counter = candidate;
+            return candidate;
+        }
+        guard += 1;
+    }
+
+    pane_counter += 1;
+    return pane_counter;
+}
+
+static void window_sync_pane_gizmos(window_state_t *window)
+{
+    if (window == NULL) {
+        return;
+    }
+
+    int active_ids[MAX_PANE_GIZMOS];
+    int active_count = window_collect_active_pane_ids(window, active_ids, MAX_PANE_GIZMOS);
+
+    for (int i = 0; i < active_count; ++i) {
+        int pane_id = active_ids[i];
+        pane_gizmo_slot_t *slot = window_alloc_pane_slot(window, pane_id);
+        if (slot == NULL) {
+            continue;
+        }
+        if (slot->gizmo.api == NULL) {
+            if (!gizmo_runtime_create(&slot->gizmo, "id_viewer",
+                &window->gizmo_gui, &window->gizmo_core, pane_id)) {
+                SDL_Log("window_manager: failed to create gizmo for pane %d", pane_id);
+            } else {
+                SDL_strlcpy(slot->title, slot->gizmo.display_name, sizeof(slot->title));
+            }
+        }
+    }
+
+    for (int i = 0; i < MAX_PANE_GIZMOS; ++i) {
+        if (!window->pane_gizmos[i].in_use) {
+            continue;
+        }
+        int pane_id = window->pane_gizmos[i].pane_id;
+        int still_active = 0;
+        for (int j = 0; j < active_count; ++j) {
+            if (active_ids[j] == pane_id) {
+                still_active = 1;
+                break;
+            }
+        }
+        if (still_active) {
+            continue;
+        }
+        gizmo_runtime_shutdown(&window->pane_gizmos[i].gizmo);
+        memset(&window->pane_gizmos[i], 0, sizeof(window->pane_gizmos[i]));
+    }
+}
+
+static void window_manager_drain_gizmo_requests(window_state_t *window)
+{
+    if (window == NULL) {
+        return;
+    }
+
+    for (int i = 0; i < window->gizmo_queue.count; ++i) {
+        const gizmo_action_request_t *request = &window->gizmo_queue.items[i];
+        pane_gizmo_slot_t *slot = window_find_pane_slot(window, request->pane_id);
+        if (slot == NULL) {
+            continue;
+        }
+        if (request->kind == GIZMO_ACTION_REPLACE_GIZMO_BY_TYPE) {
+            gizmo_runtime_replace(&slot->gizmo, request->value);
+            slot->last_width = -1;
+            slot->last_height = -1;
+            SDL_strlcpy(slot->title, slot->gizmo.display_name, sizeof(slot->title));
+        } else if (request->kind == GIZMO_ACTION_UPDATE_PANE_TITLE) {
+            SDL_strlcpy(slot->title, request->value, sizeof(slot->title));
+        }
+    }
+    window->gizmo_queue.count = 0;
+}
+
+static int window_manager_clone_pane(window_state_t *window, tab_state_t *tab, int target_node,
+    const SDL_Rect *target_rect, int source_pane_id)
+{
+    if (window == NULL || tab == NULL || target_rect == NULL || target_node < 0) {
+        return 0;
+    }
+
+    int new_pane_id = window_next_unique_pane_id(window);
+    int new_leaf = split_tree_insert_new_pane(tab, target_node, new_pane_id, DROP_ZONE_RIGHT, target_rect);
+    if (new_leaf < 0) {
+        return 0;
+    }
+
+    pane_gizmo_slot_t *source = window_find_pane_slot(window, source_pane_id);
+    pane_gizmo_slot_t *dest = window_alloc_pane_slot(window, new_pane_id);
+    if (dest == NULL) {
+        return 0;
+    }
+
+    if (source != NULL && source->gizmo.api != NULL) {
+        if (!gizmo_runtime_create(&dest->gizmo, source->gizmo.type_id,
+            &window->gizmo_gui, &window->gizmo_core, new_pane_id)) {
+            return 0;
+        }
+        gizmo_runtime_clone_state(&source->gizmo, &dest->gizmo);
+        SDL_strlcpy(dest->title, source->title, sizeof(dest->title));
+    } else {
+        if (!gizmo_runtime_create(&dest->gizmo, "id_viewer",
+            &window->gizmo_gui, &window->gizmo_core, new_pane_id)) {
+            return 0;
+        }
+        SDL_strlcpy(dest->title, dest->gizmo.display_name, sizeof(dest->title));
+    }
+
+    dest->last_width = -1;
+    dest->last_height = -1;
+    tab->focused_pane_node = new_leaf;
+    return 1;
 }
 
 void window_manager_sync_mouse_inside(window_state_t *window)
@@ -373,14 +610,25 @@ static SDL_Rect get_header_detach_rect(const SDL_Rect *header_rect)
     return make_rect(x, y, HEADER_DETACH_SIZE, HEADER_DETACH_SIZE);
 }
 
+static SDL_Rect get_header_clone_rect(const SDL_Rect *header_rect)
+{
+    if (header_rect == NULL) {
+        return make_rect(0, 0, 0, 0);
+    }
+    int x = header_rect->x + header_rect->w - HEADER_BUTTON_PADDING - HEADER_BUTTON_SIZE -
+        HEADER_DETACH_PADDING - HEADER_DETACH_SIZE - HEADER_CLONE_PADDING - HEADER_CLONE_SIZE;
+    int y = header_rect->y + (HEADER_HEIGHT - HEADER_CLONE_SIZE) / 2;
+    return make_rect(x, y, HEADER_CLONE_SIZE, HEADER_CLONE_SIZE);
+}
+
 static SDL_Rect get_header_add_rect(const SDL_Rect *header_rect)
 {
 	if (header_rect == NULL) {
 		return make_rect(0, 0, 0, 0);
 	}
 	int x = header_rect->x + header_rect->w - HEADER_BUTTON_PADDING - HEADER_BUTTON_SIZE -
-		HEADER_DETACH_PADDING - HEADER_DETACH_SIZE - HEADER_DETACH_PADDING -
-		HEADER_DETACH_SIZE;
+		HEADER_DETACH_PADDING - HEADER_DETACH_SIZE - HEADER_CLONE_PADDING - HEADER_CLONE_SIZE -
+        HEADER_DETACH_PADDING - HEADER_DETACH_SIZE;
 	int y = header_rect->y + (HEADER_HEIGHT - HEADER_DETACH_SIZE) / 2;
 	return make_rect(x, y, HEADER_DETACH_SIZE, HEADER_DETACH_SIZE);
 }
@@ -510,6 +758,42 @@ static void draw_up_icon(SDL_Renderer *renderer, const SDL_Rect *rect, int thick
         SDL_RenderDrawLine(renderer, mid_x + i, bottom_y, mid_x + i, top_y);
         SDL_RenderDrawLine(renderer, mid_x + i, top_y, rect->x + 3, rect->y + rect->h / 2);
         SDL_RenderDrawLine(renderer, mid_x + i, top_y, rect->x + rect->w - 3, rect->y + rect->h / 2);
+    }
+}
+
+static void draw_clone_icon(SDL_Renderer *renderer, const SDL_Rect *rect, int thickness)
+{
+    if (renderer == NULL || rect == NULL) {
+        return;
+    }
+
+    SDL_Rect front = {
+        rect->x + rect->w / 4,
+        rect->y + rect->h / 4,
+        rect->w * 3 / 4 - 1,
+        rect->h * 3 / 4 - 1
+    };
+    SDL_Rect back = {
+        rect->x + 1,
+        rect->y + 1,
+        rect->w * 3 / 4 - 1,
+        rect->h * 3 / 4 - 1
+    };
+
+    for (int i = 0; i < thickness; ++i) {
+        SDL_RenderDrawRect(renderer, &back);
+        SDL_RenderDrawRect(renderer, &front);
+        back.x += 1;
+        back.y += 1;
+        back.w -= 2;
+        back.h -= 2;
+        front.x += 1;
+        front.y += 1;
+        front.w -= 2;
+        front.h -= 2;
+        if (back.w <= 0 || back.h <= 0 || front.w <= 0 || front.h <= 0) {
+            break;
+        }
     }
 }
 
@@ -1181,6 +1465,7 @@ static int window_manager_handle_mouse_down(window_state_t *window, int mouse_x,
         );
         SDL_Rect close_rect = get_header_close_rect(&header_rect);
         SDL_Rect detach_rect = get_header_detach_rect(&header_rect);
+        SDL_Rect clone_rect = get_header_clone_rect(&header_rect);
 		SDL_Rect add_rect = get_header_add_rect(&header_rect);
         if (header_rect.w >= HEADER_BUTTON_SIZE + HEADER_BUTTON_PADDING * 2 &&
             point_in_rect(mouse_x, mouse_y, &close_rect)) {
@@ -1227,10 +1512,10 @@ static int window_manager_handle_mouse_down(window_state_t *window, int mouse_x,
             window_manager_update_cursor(window);
             return 0;
         }
-		if (header_rect.w >= HEADER_DETACH_SIZE * 2 + HEADER_DETACH_PADDING * 4 &&
+		if (header_rect.w >= HEADER_DETACH_SIZE * 3 + HEADER_DETACH_PADDING * 6 &&
 			point_in_rect(mouse_x, mouse_y, &add_rect)) {
 			window->is_creating_pane = 1;
-			window->pending_pane_id = ++pane_counter;
+			window->pending_pane_id = window_next_unique_pane_id(window);
 			window->esc_cancel_active = 0;
 			window->hover_drop_zone = DROP_ZONE_NONE;
 			window->is_dragging_header = 0;
@@ -1240,6 +1525,14 @@ static int window_manager_handle_mouse_down(window_state_t *window, int mouse_x,
 			window_manager_update_cursor(window);
 			return 1;
 		}
+        if (header_rect.w >= HEADER_CLONE_SIZE + HEADER_CLONE_PADDING * 2 &&
+            point_in_rect(mouse_x, mouse_y, &clone_rect)) {
+            if (window_manager_clone_pane(window, tab, leaves[leaf_index].node_index,
+                &leaves[leaf_index].rect, leaves[leaf_index].pane_id)) {
+                window_manager_update_cursor(window);
+                return 1;
+            }
+        }
 		if (header_rect.w >= HEADER_DETACH_SIZE + HEADER_DETACH_PADDING * 2 &&
             point_in_rect(mouse_x, mouse_y, &detach_rect)) {
             window->pending_detach = 1;
@@ -1300,7 +1593,8 @@ static void window_manager_update_cursor(window_state_t *window)
 	} else if (window->hover_menu_bar) {
 		kind = CURSOR_KIND_HAND_OPEN;
 	} else if (window->hover_menu_button || window->hover_header_close ||
-		window->hover_header_detach || window->hover_tab_add || window->hover_tab_index >= 0) {
+        window->hover_header_clone || window->hover_header_detach ||
+        window->hover_tab_add || window->hover_tab_index >= 0) {
         kind = CURSOR_KIND_HAND_ONE_FINGER;
     } else if (window->hover_header) {
         kind = CURSOR_KIND_HAND_OPEN;
@@ -1310,12 +1604,12 @@ static void window_manager_update_cursor(window_state_t *window)
 	cursor_manager_set_active_with_os(&window->cursor_manager, kind, use_os_cursor);
 }
 
- static void draw_segment(SDL_Renderer *renderer, const SDL_Rect *rect)
+void draw_segment(SDL_Renderer *renderer, const SDL_Rect *rect)
  {
      SDL_RenderFillRect(renderer, rect);
  }
  
- static void draw_digit(SDL_Renderer *renderer, int digit, const SDL_Rect *bounds)
+void draw_digit(SDL_Renderer *renderer, int digit, const SDL_Rect *bounds)
  {
      static const unsigned char digit_masks[10] = {
          0x3F, /* 0 */
@@ -1426,6 +1720,10 @@ skrontch_error_t window_manager_init(window_state_t *window, const char *title, 
 	SDL_SetWindowHitTest(window->window, NULL, NULL);
 	SDL_SetWindowResizable(window->window, SDL_TRUE);
 	SDL_SetWindowBordered(window->window, SDL_FALSE);
+    window->gizmo_gui.renderer = window->renderer;
+    window->gizmo_gui.enqueue_request = window_enqueue_gizmo_request;
+    window->gizmo_gui.enqueue_userdata = window;
+    window->gizmo_core.userdata = window;
     cursor_manager_init(&window->cursor_manager, window->renderer);
     window_manager_update_cursor(window);
 
@@ -1434,6 +1732,7 @@ skrontch_error_t window_manager_init(window_state_t *window, const char *title, 
     window->tab_count = 1;
     window->active_tab = 0;
     pane_counter_seed_from_window(window);
+    window_sync_pane_gizmos(window);
 
 	char logo_path[512];
 	SDL_Surface *logo_surface = NULL;
@@ -1479,6 +1778,14 @@ void window_manager_shutdown(window_state_t *window)
 	window->menu_logo_width = 0;
 	window->menu_logo_height = 0;
 
+    for (int i = 0; i < MAX_PANE_GIZMOS; ++i) {
+        if (!window->pane_gizmos[i].in_use) {
+            continue;
+        }
+        gizmo_runtime_shutdown(&window->pane_gizmos[i].gizmo);
+        memset(&window->pane_gizmos[i], 0, sizeof(window->pane_gizmos[i]));
+    }
+
     cursor_manager_shutdown(&window->cursor_manager);
  }
  
@@ -1510,8 +1817,9 @@ int window_manager_handle_event(window_state_t *window, const SDL_Event *event)
         if (event->window.event == SDL_WINDOWEVENT_LEAVE) {
             window->hover_header = 0;
             window->hover_header_close = 0;
-		window->hover_menu_button = 0;
-		window->hover_menu_bar = 0;
+            window->hover_header_clone = 0;
+            window->hover_menu_button = 0;
+            window->hover_menu_bar = 0;
             window->hover_split_node = -1;
             window->hover_drop_zone = DROP_ZONE_NONE;
             window->hover_tab_index = -1;
@@ -1673,9 +1981,10 @@ int window_manager_handle_event(window_state_t *window, const SDL_Event *event)
             window->hover_split_node = -1;
             window->hover_header = 0;
             window->hover_header_close = 0;
+            window->hover_header_clone = 0;
             window->hover_header_detach = 0;
             window->hover_menu_button = 0;
-		window->hover_menu_bar = 0;
+            window->hover_menu_bar = 0;
             window->hover_tab_index = -1;
             window->hover_tab_add = 0;
             window->hover_drop_zone = DROP_ZONE_NONE;
@@ -1726,14 +2035,18 @@ int window_manager_handle_event(window_state_t *window, const SDL_Event *event)
                 );
                 SDL_Rect close_rect = get_header_close_rect(&header_rect);
                 SDL_Rect detach_rect = get_header_detach_rect(&header_rect);
-			SDL_Rect add_rect = get_header_add_rect(&header_rect);
+                SDL_Rect clone_rect = get_header_clone_rect(&header_rect);
+                SDL_Rect add_rect = get_header_add_rect(&header_rect);
                 if (point_in_rect(mouse_x, mouse_y, &header_rect)) {
                     if (header_rect.w >= HEADER_BUTTON_SIZE + HEADER_BUTTON_PADDING * 2 &&
                         point_in_rect(mouse_x, mouse_y, &close_rect)) {
                         window->hover_header_close = 1;
-				} else if (header_rect.w >= HEADER_DETACH_SIZE * 2 + HEADER_DETACH_PADDING * 4 &&
-					point_in_rect(mouse_x, mouse_y, &add_rect)) {
-					window->hover_menu_button = 1;
+                    } else if (header_rect.w >= HEADER_DETACH_SIZE * 3 + HEADER_DETACH_PADDING * 6 &&
+                        point_in_rect(mouse_x, mouse_y, &add_rect)) {
+                        window->hover_menu_button = 1;
+                    } else if (header_rect.w >= HEADER_CLONE_SIZE + HEADER_CLONE_PADDING * 2 &&
+                        point_in_rect(mouse_x, mouse_y, &clone_rect)) {
+                        window->hover_header_clone = 1;
                     } else if (header_rect.w >= HEADER_DETACH_SIZE + HEADER_DETACH_PADDING * 2 &&
                         point_in_rect(mouse_x, mouse_y, &detach_rect)) {
                         window->hover_header_detach = 1;
@@ -1879,7 +2192,7 @@ int window_manager_handle_event(window_state_t *window, const SDL_Event *event)
     return state_changed;
 }
 
-static void draw_number(SDL_Renderer *renderer, int value, const SDL_Rect *bounds, int spacing)
+void draw_number(SDL_Renderer *renderer, int value, const SDL_Rect *bounds, int spacing)
 {
     if (renderer == NULL || bounds == NULL) {
         return;
@@ -1916,6 +2229,38 @@ static void draw_number(SDL_Renderer *renderer, int value, const SDL_Rect *bound
         SDL_Rect digit_bounds = { start_x + i * (bounds->w + spacing), y, bounds->w, bounds->h };
         draw_digit(renderer, digits[i], &digit_bounds);
     }
+}
+
+static void window_build_gizmo_input(window_state_t *window, int is_focused, SDL_Rect pane_rect,
+    gizmo_input_state_t *out_input)
+{
+    static Uint16 zero_keys[SDL_NUM_SCANCODES] = { 0 };
+    if (out_input == NULL) {
+        return;
+    }
+    memset(out_input, 0, sizeof(*out_input));
+    out_input->is_focused = is_focused;
+
+    if (window == NULL) {
+        return;
+    }
+
+    if (!is_focused || window->app == NULL) {
+        out_input->keys_down = zero_keys;
+        out_input->key_count = SDL_NUM_SCANCODES;
+        return;
+    }
+
+    const input_state_t *input = &window->app->input;
+    out_input->mouse_x = input->mouse_x - pane_rect.x;
+    out_input->mouse_y = input->mouse_y - pane_rect.y;
+    out_input->mouse_left_frames = input->mouse_left_frames;
+    out_input->mouse_right_frames = input->mouse_right_frames;
+    out_input->mouse_middle_frames = input->mouse_middle_frames;
+    out_input->wheel_x = input->wheel_x;
+    out_input->wheel_y = input->wheel_y;
+    out_input->keys_down = input->keys_down;
+    out_input->key_count = SDL_NUM_SCANCODES;
 }
  
 static int window_manager_apply_resize_drag(window_state_t *window)
@@ -1984,7 +2329,9 @@ void window_manager_update(window_state_t *window, float delta_seconds)
          return;
      }
  
-     (void)delta_seconds;
+    window->last_delta_seconds = delta_seconds;
+    window_sync_pane_gizmos(window);
+    window_manager_drain_gizmo_requests(window);
 	if (window->is_resizing_window) {
 		if (window_manager_apply_resize_drag(window)) {
 			window_manager_render(window);
@@ -2013,6 +2360,8 @@ void window_manager_render(window_state_t *window)
     SDL_Color background = palette_get_color("black");
     SDL_SetRenderDrawColor(window->renderer, background.r, background.g, background.b, background.a);
     SDL_RenderClear(window->renderer);
+
+    window_sync_pane_gizmos(window);
  
     tab_state_t *tab = window_get_active_tab(window);
     if (tab == NULL) {
@@ -2057,13 +2406,21 @@ void window_manager_render(window_state_t *window)
             draw_x_icon(window->renderer, &close_rect, 2);
         }
 
-		if (header_rect.w >= HEADER_DETACH_SIZE * 2 + HEADER_DETACH_PADDING * 4) {
+		if (header_rect.w >= HEADER_DETACH_SIZE * 3 + HEADER_DETACH_PADDING * 6) {
 			SDL_Rect add_rect = get_header_add_rect(&header_rect);
 			SDL_Color icon_color = palette_get_color("white");
 			SDL_SetRenderDrawColor(window->renderer, icon_color.r, icon_color.g, icon_color.b,
 				icon_color.a);
 			draw_plus_icon(window->renderer, &add_rect, 2);
 		}
+
+        if (header_rect.w >= HEADER_CLONE_SIZE + HEADER_CLONE_PADDING * 2) {
+            SDL_Rect clone_rect = get_header_clone_rect(&header_rect);
+            SDL_Color icon_color = palette_get_color("white");
+            SDL_SetRenderDrawColor(window->renderer, icon_color.r, icon_color.g, icon_color.b,
+                icon_color.a);
+            draw_clone_icon(window->renderer, &clone_rect, 1);
+        }
 
 		if (header_rect.w >= HEADER_DETACH_SIZE + HEADER_DETACH_PADDING * 2) {
             SDL_Rect detach_rect = get_header_detach_rect(&header_rect);
@@ -2073,31 +2430,29 @@ void window_manager_render(window_state_t *window)
             draw_up_icon(window->renderer, &detach_rect, 2);
         }
 
-        if (pane_id > 0) {
-            int min_dim = leaves[i].rect.w < leaves[i].rect.h ? leaves[i].rect.w : leaves[i].rect.h;
-            int digit_size = min_dim / 3;
-            if (digit_size < 16) {
-                digit_size = 16;
+        pane_gizmo_slot_t *slot = window_find_pane_slot(window, pane_id);
+        if (slot != NULL && slot->gizmo.api != NULL) {
+            SDL_Rect gizmo_bounds = leaves[i].rect;
+            gizmo_bounds.y += HEADER_HEIGHT;
+            gizmo_bounds.h -= HEADER_HEIGHT;
+            if (gizmo_bounds.h < 0) {
+                gizmo_bounds.h = 0;
             }
+            if (slot->last_width != gizmo_bounds.w || slot->last_height != gizmo_bounds.h) {
+                slot->last_width = gizmo_bounds.w;
+                slot->last_height = gizmo_bounds.h;
+                if (slot->gizmo.api->on_resize != NULL) {
+                    slot->gizmo.api->on_resize(&slot->gizmo, gizmo_bounds.w, gizmo_bounds.h);
+                }
+            }
+            slot->gizmo.bounds = gizmo_bounds;
 
-            SDL_Rect digit_bounds = {
-                leaves[i].rect.x + (leaves[i].rect.w - digit_size) / 2,
-                leaves[i].rect.y + (leaves[i].rect.h - digit_size) / 2,
-                digit_size,
-                digit_size
-            };
-
-            SDL_Color digit_color = palette_get_color("white");
-            SDL_SetRenderDrawColor(window->renderer, digit_color.r, digit_color.g, digit_color.b, digit_color.a);
-            draw_number(window->renderer, pane_id, &digit_bounds, digit_size / 5);
-
-            SDL_Rect header_digit = {
-                leaves[i].rect.x + 8,
-                leaves[i].rect.y + 6,
-                14,
-                16
-            };
-            draw_number(window->renderer, pane_id, &header_digit, 2);
+            gizmo_input_state_t gizmo_input;
+            int is_focused = leaves[i].node_index == tab->focused_pane_node;
+            window_build_gizmo_input(window, is_focused, gizmo_bounds, &gizmo_input);
+            if (slot->gizmo.api->update_and_render != NULL) {
+                slot->gizmo.api->update_and_render(&slot->gizmo, window->last_delta_seconds, &gizmo_input);
+            }
         }
 
         if (leaves[i].node_index == tab->focused_pane_node) {
@@ -2289,6 +2644,7 @@ void window_manager_render(window_state_t *window)
 	SDL_Rect window_border_rect = make_rect(0, 0, window->width, window->height);
 	SDL_RenderDrawRect(window->renderer, &window_border_rect);
 
+    window_manager_drain_gizmo_requests(window);
     cursor_manager_render(&window->cursor_manager);
 
     SDL_RenderPresent(window->renderer);
@@ -2318,6 +2674,7 @@ void window_manager_set_tabs(window_state_t *window, const tab_state_t *tabs, in
         active_tab = 0;
     }
     window->active_tab = active_tab;
+    window_sync_pane_gizmos(window);
 }
 
 int window_manager_extract_detached_tab(window_state_t *window, tab_state_t *tab_out)
