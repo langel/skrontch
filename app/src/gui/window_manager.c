@@ -1700,9 +1700,6 @@ skrontch_error_t window_manager_init(window_state_t *window, const char *title, 
 	}
 
 	Uint32 renderer_flags = SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC;
-#ifdef __APPLE__
-	renderer_flags = SDL_RENDERER_SOFTWARE;
-#endif
     window->renderer = SDL_CreateRenderer(
         window->window,
          -1,
