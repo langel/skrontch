@@ -27,6 +27,7 @@ Skrontch provides an integrated workspace for game development content creation,
 1. Download the SDL2 development package and extract it.
 2. Set `SDL2_DIR` to the extracted folder:
    - Example: `set SDL2_DIR=C:\libs\SDL2`
+	- MSYS: `set SDL2_DIR=C:\Users\knoxb\source\msys\mingw64`
 3. Build:
    - `build.bat`
 4. Run:
