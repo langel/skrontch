@@ -33,6 +33,8 @@ Skrontch provides an integrated workspace for game development content creation,
 4. Run:
    - `run.bat`
 
+Build a release: `build.bat release` which includes SDL statically.
+
 If `SDL2.dll` is found in your SDL2 `lib` folder, `build.bat` will copy it into `build/`.
 
 ### macOS/Linux (bash)
