@@ -816,7 +816,7 @@ typedef struct tab_info_t {
     int tab_index;
 } tab_info_t;
 
-static int tab_state_is_valid(const tab_state_t *tab)
+static int window_tab_state_is_valid(const tab_state_t *tab)
 {
     if (tab == NULL || tab->node_count <= 0 || tab->node_count > MAX_SPLIT_NODES) {
         return 0;
@@ -1209,7 +1209,7 @@ static tab_state_t *window_get_active_tab(window_state_t *window)
     if (index < 0 || index >= window->tab_count) {
         index = 0;
     }
-    if (!tab_state_is_valid(&window->tabs[index])) {
+	if (!window_tab_state_is_valid(&window->tabs[index])) {
         tab_state_init_default(&window->tabs[index]);
     }
     return &window->tabs[index];
@@ -1604,60 +1604,6 @@ static void window_manager_update_cursor(window_state_t *window)
 	cursor_manager_set_active_with_os(&window->cursor_manager, kind, use_os_cursor);
 }
 
-void draw_segment(SDL_Renderer *renderer, const SDL_Rect *rect)
- {
-     SDL_RenderFillRect(renderer, rect);
- }
- 
-void draw_digit(SDL_Renderer *renderer, int digit, const SDL_Rect *bounds)
- {
-     static const unsigned char digit_masks[10] = {
-         0x3F, /* 0 */
-         0x06, /* 1 */
-         0x5B, /* 2 */
-         0x4F, /* 3 */
-         0x66, /* 4 */
-         0x6D, /* 5 */
-         0x7D, /* 6 */
-         0x07, /* 7 */
-         0x7F, /* 8 */
-         0x6F  /* 9 */
-     };
- 
-     int thickness = bounds->w < bounds->h ? bounds->w / 6 : bounds->h / 6;
-     if (thickness < 2) {
-         thickness = 2;
-     }
- 
-     int x = bounds->x;
-     int y = bounds->y;
-     int w = bounds->w;
-     int h = bounds->h;
-     int long_w = w - thickness * 2;
-     int long_h = (h - thickness * 3) / 2;
- 
-     SDL_Rect segments[7] = {
-         { x + thickness, y, long_w, thickness }, /* a */
-         { x + w - thickness, y + thickness, thickness, long_h }, /* b */
-         { x + w - thickness, y + thickness * 2 + long_h, thickness, long_h }, /* c */
-         { x + thickness, y + h - thickness, long_w, thickness }, /* d */
-         { x, y + thickness * 2 + long_h, thickness, long_h }, /* e */
-         { x, y + thickness, thickness, long_h }, /* f */
-         { x + thickness, y + thickness + long_h, long_w, thickness } /* g */
-     };
- 
-     if (digit < 0 || digit > 9) {
-         return;
-     }
- 
-     unsigned char mask = digit_masks[digit];
-     for (int i = 0; i < 7; ++i) {
-         if (mask & (1 << i)) {
-             draw_segment(renderer, &segments[i]);
-         }
-     }
- }
- 
 skrontch_error_t window_manager_init(window_state_t *window, const char *title, int width, int height,
     int x, int y, int use_position)
  {
@@ -2189,45 +2135,6 @@ int window_manager_handle_event(window_state_t *window, const SDL_Event *event)
     return state_changed;
 }
 
-void draw_number(SDL_Renderer *renderer, int value, const SDL_Rect *bounds, int spacing)
-{
-    if (renderer == NULL || bounds == NULL) {
-        return;
-    }
-
-    if (value < 0) {
-        value = 0;
-    }
-
-    int digits[8];
-    int count = 0;
-    if (value == 0) {
-        digits[count++] = 0;
-    } else {
-        while (value > 0 && count < (int)(sizeof(digits) / sizeof(digits[0]))) {
-            digits[count++] = value % 10;
-            value /= 10;
-        }
-        for (int i = 0; i < count / 2; ++i) {
-            int temp = digits[i];
-            digits[i] = digits[count - 1 - i];
-            digits[count - 1 - i] = temp;
-        }
-    }
-
-    if (count <= 0) {
-        return;
-    }
-
-    int total_width = bounds->w * count + spacing * (count - 1);
-    int start_x = bounds->x + (bounds->w - total_width) / 2;
-    int y = bounds->y;
-    for (int i = 0; i < count; ++i) {
-        SDL_Rect digit_bounds = { start_x + i * (bounds->w + spacing), y, bounds->w, bounds->h };
-        draw_digit(renderer, digits[i], &digit_bounds);
-    }
-}
-
 static void window_build_gizmo_input(window_state_t *window, int is_focused, SDL_Rect pane_rect,
     gizmo_input_state_t *out_input)
 {
@@ -2660,7 +2567,7 @@ void window_manager_set_tabs(window_state_t *window, const tab_state_t *tabs, in
 
     for (int i = 0; i < tab_count; ++i) {
         window->tabs[i] = tabs[i];
-        if (!tab_state_is_valid(&window->tabs[i])) {
+		if (!window_tab_state_is_valid(&window->tabs[i])) {
             tab_state_init_default_with_ids(&window->tabs[i]);
         }
     }

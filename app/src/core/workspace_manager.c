@@ -315,7 +315,7 @@ static int parse_split_node(const char **cursor, split_node_t *node)
     }
 }
 
-static int tab_state_is_valid(const tab_state_t *tab)
+static int workspace_tab_state_is_valid(const tab_state_t *tab)
 {
     if (tab == NULL || tab->node_count <= 0 || tab->node_count > MAX_SPLIT_NODES) {
         return 0;
@@ -418,7 +418,7 @@ static int parse_tab(const char **cursor, tab_state_t *tab)
         }
         if (*pos == '}') {
             *cursor = pos + 1;
-            if (!tab_state_is_valid(tab)) {
+			if (!workspace_tab_state_is_valid(tab)) {
                 tab_state_init_default(tab);
             }
             return 1;
